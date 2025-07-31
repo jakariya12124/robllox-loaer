@@ -1,16 +1,15 @@
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer
-local Character = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 local UIS = game:GetService("UserInputService")
 local RS = game:GetService("RunService")
+
+local LocalPlayer = Players.LocalPlayer
+local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
 -- GUI Setup
 local screenGui = Instance.new("ScreenGui", PlayerGui)
 screenGui.Name = "FlyGui"
 screenGui.ResetOnSpawn = false
 
--- Main Frame
 local frame = Instance.new("Frame", screenGui)
 frame.Size = UDim2.new(0, 250, 0, 130)
 frame.Position = UDim2.new(0.4, 0, 0.1, 0)
@@ -21,15 +20,13 @@ frame.BackgroundTransparency = 0.2
 local uiCorner = Instance.new("UICorner", frame)
 uiCorner.CornerRadius = UDim.new(0, 12)
 
--- Drag Logic
+-- Drag logic for GUI
 local dragging = false
 local dragInput, dragStart, startPos
-
 local function update(input)
 	local delta = input.Position - dragStart
 	frame.Position = UDim2.new(startPos.X.Scale, startPos.X.Offset + delta.X, startPos.Y.Scale, startPos.Y.Offset + delta.Y)
 end
-
 frame.InputBegan:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseButton1 or input.UserInputType == Enum.UserInputType.Touch then
 		dragging = true
@@ -43,13 +40,11 @@ frame.InputBegan:Connect(function(input)
 		end)
 	end
 end)
-
 frame.InputChanged:Connect(function(input)
 	if input.UserInputType == Enum.UserInputType.MouseMovement or input.UserInputType == Enum.UserInputType.Touch then
 		dragInput = input
 	end
 end)
-
 RS.RenderStepped:Connect(function()
 	if dragging and dragInput then
 		update(dragInput)
@@ -74,7 +69,7 @@ local speedLabel = Instance.new("TextLabel", frame)
 speedLabel.Position = UDim2.new(0, 10, 0, 60)
 speedLabel.Size = UDim2.new(0, 100, 0, 25)
 speedLabel.Text = "Speed: 50"
-speedLabel.TextColor3 = Color3.new(1,1,1)
+speedLabel.TextColor3 = Color3.new(1, 1, 1)
 speedLabel.BackgroundTransparency = 1
 speedLabel.Font = Enum.Font.Gotham
 speedLabel.TextSize = 18
@@ -135,11 +130,71 @@ RS.RenderStepped:Connect(function()
 	end
 end)
 
--- Fly Logic
+-- Flying control variables
 local flying = false
 local bodyGyro
 local bodyVelocity
 
+local moveVector = Vector3.new(0,0,0)
+local moveKeys = {
+	W = false,
+	A = false,
+	S = false,
+	D = false,
+	Space = false,
+	LeftShift = false,
+}
+
+-- Update moveVector from keys pressed
+local function updateMoveVector()
+	local char = LocalPlayer.Character
+	if not char then return end
+	local hrp = char:FindFirstChild("HumanoidRootPart")
+	if not hrp then return end
+
+	local camCF = workspace.CurrentCamera.CFrame
+	local forward = Vector3.new(camCF.LookVector.X, 0, camCF.LookVector.Z).Unit
+	local right = Vector3.new(camCF.RightVector.X, 0, camCF.RightVector.Z).Unit
+	local up = Vector3.new(0,1,0)
+
+	local moveDir = Vector3.new(0,0,0)
+	if moveKeys.W then moveDir = moveDir + forward end
+	if moveKeys.S then moveDir = moveDir - forward end
+	if moveKeys.A then moveDir = moveDir - right end
+	if moveKeys.D then moveDir = moveDir + right end
+	if moveKeys.Space then moveDir = moveDir + up end
+	if moveKeys.LeftShift then moveDir = moveDir - up end
+
+	if moveDir.Magnitude > 0 then
+		moveDir = moveDir.Unit
+	end
+
+	moveVector = moveDir * (speedValue or 50)
+end
+
+-- Input handlers
+UIS.InputBegan:Connect(function(input, gameProcessed)
+	if gameProcessed then return end
+	if input.KeyCode == Enum.KeyCode.W then moveKeys.W = true end
+	if input.KeyCode == Enum.KeyCode.A then moveKeys.A = true end
+	if input.KeyCode == Enum.KeyCode.S then moveKeys.S = true end
+	if input.KeyCode == Enum.KeyCode.D then moveKeys.D = true end
+	if input.KeyCode == Enum.KeyCode.Space then moveKeys.Space = true end
+	if input.KeyCode == Enum.KeyCode.LeftShift then moveKeys.LeftShift = true end
+	updateMoveVector()
+end)
+
+UIS.InputEnded:Connect(function(input, gameProcessed)
+	if input.KeyCode == Enum.KeyCode.W then moveKeys.W = false end
+	if input.KeyCode == Enum.KeyCode.A then moveKeys.A = false end
+	if input.KeyCode == Enum.KeyCode.S then moveKeys.S = false end
+	if input.KeyCode == Enum.KeyCode.D then moveKeys.D = false end
+	if input.KeyCode == Enum.KeyCode.Space then moveKeys.Space = false end
+	if input.KeyCode == Enum.KeyCode.LeftShift then moveKeys.LeftShift = false end
+	updateMoveVector()
+end)
+
+-- Fly logic
 local function stopFlying()
 	flying = false
 	if bodyGyro then bodyGyro:Destroy() end
@@ -154,31 +209,38 @@ local function startFlying()
 
 	flying = true
 
-	-- Stage 1: Fly
 	bodyGyro = Instance.new("BodyGyro")
 	bodyGyro.P = 9e4
-	bodyGyro.MaxTorque = Vector3.new(9e9, 9e9, 9e9)
+	bodyGyro.MaxTorque = Vector3.new(9e9,9e9,9e9)
 	bodyGyro.CFrame = hrp.CFrame
 	bodyGyro.Parent = hrp
 
 	bodyVelocity = Instance.new("BodyVelocity")
-	bodyVelocity.Velocity = Vector3.new(0, speedValue, 0)
-	bodyVelocity.MaxForce = Vector3.new(9e9, 9e9, 9e9)
+	bodyVelocity.MaxForce = Vector3.new(9e9,9e9,9e9)
 	bodyVelocity.Parent = hrp
 
-	print("✅ Flying at speed:", speedValue)
+	print("✅ Flying started")
 
-	task.wait(math.random(3, 5))
+	-- Move update loop
+	local connection
+	connection = RS.Heartbeat:Connect(function()
+		if not flying then connection:Disconnect() return end
+		bodyGyro.CFrame = workspace.CurrentCamera.CFrame
+		bodyVelocity.Velocity = moveVector
+	end)
+
+	-- Fly duration before fail
+	task.wait(math.random(3,5))
 
 	if flying then
-		-- Stage 2: Slow fall
-		print("⚠️ Losing power...")
+		print("⚠️ Losing power, slow fall")
 		bodyVelocity.Velocity = Vector3.new(0, -15, 0)
+		connection:Disconnect()
+
 		task.wait(2)
 	end
 
 	if flying then
-		-- Stage 3: Full fall
 		print("⛔ Full fall now!")
 		bodyVelocity.Velocity = Vector3.new(0, -100, 0)
 		task.wait(1.5)
@@ -186,8 +248,6 @@ local function startFlying()
 	end
 end
 
--- Button click
 flyButton.MouseButton1Click:Connect(function()
 	startFlying()
 end)
-
