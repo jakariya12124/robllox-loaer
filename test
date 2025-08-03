@@ -1,4 +1,4 @@
-
+--// Anti Monitor Script
 function loadAntiMonitorScript()
 	local Players = game:GetService("Players")
 	local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
