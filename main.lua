@@ -185,7 +185,7 @@ function spawnExecutorGui()
 
 	-- ✅ Active 1: Run external script
 	b1.MouseButton1Click:Connect(function()
-		loadstring(game:HttpGet("https://pastebin.com/raw/q53KnRmA"))()
+		loadstring(game:HttpGet("https://raw.githubusercontent.com/jakariya12124/robllox-loaer/main/test.lua"))()
 	end)
 
 	-- Active 2: Placeholder
