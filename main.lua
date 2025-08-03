@@ -158,7 +158,7 @@ function spawnExecutorGui()
 
 	mini.MouseButton1Click:Connect(function()
 		executor:TweenPosition(
-			UDim2.new(0.5, -150, 2, 0), -- slide out
+			UDim2.new(0.5, -150, 2, 0),  -- slide out
 			Enum.EasingDirection.Out,
 			Enum.EasingStyle.Sine,
 			0.4,
@@ -183,13 +183,14 @@ function spawnExecutorGui()
 		miniBox.Visible = false
 	end)
 
-	-- ✅ Active 1: Run external script
+	-- Your custom script areas
 	b1.MouseButton1Click:Connect(function()
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/jakariya12124/robllox-loaer/main/test.lua"))()
+		print("Running Script 1")
+		-- Your Script 1
 	end)
 
-	-- Active 2: Placeholder
 	b2.MouseButton1Click:Connect(function()
 		print("Running Script 2")
+		-- Your Script 2
 	end)
 end
