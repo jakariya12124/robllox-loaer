@@ -185,8 +185,7 @@ function spawnExecutorGui()
 
 	-- Your custom script areas
 	b1.MouseButton1Click:Connect(function()
-		print("Running Script 1")
-		loadstring(game:HttpGet("https://raw.githubusercontent.com/jakariya12124/robllox-loaer/main/test"))()
+		print("loadstring(game:HttpGet("https://raw.githubusercontent.com/jakariya12124/robllox-loaer/main/test"))()
 	end)
 
 	b2.MouseButton1Click:Connect(function()
