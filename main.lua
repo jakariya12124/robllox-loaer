@@ -1,18 +1,27 @@
---// Anti Monitor Script (Auto Run)
 local Players = game:GetService("Players")
-local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
+
+local LocalPlayer = Players.LocalPlayer
+if not LocalPlayer then
+	-- Wait for LocalPlayer if script runs too early
+	Players.PlayerAdded:Wait()
+	LocalPlayer = Players.LocalPlayer
+end
+
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-local ScreenGui = Instance.new("ScreenGui", PlayerGui)
+-- Create GUI
+local ScreenGui = Instance.new("ScreenGui")
 ScreenGui.Name = "AutoQuitStatusGUI"
+ScreenGui.Parent = PlayerGui
 
-local Indicator = Instance.new("Frame", ScreenGui)
+local Indicator = Instance.new("Frame")
 Indicator.Size = UDim2.new(0, 150, 0, 30)
 Indicator.Position = UDim2.new(0, 10, 0, 10)
 Indicator.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
 Indicator.BorderSizePixel = 0
+Indicator.Parent = ScreenGui
 
-local StatusLabel = Instance.new("TextLabel", Indicator)
+local StatusLabel = Instance.new("TextLabel")
 StatusLabel.Size = UDim2.new(1, -40, 1, 0)
 StatusLabel.Position = UDim2.new(0, 40, 0, 0)
 StatusLabel.BackgroundTransparency = 1
@@ -21,21 +30,27 @@ StatusLabel.TextColor3 = Color3.new(0, 0, 0)
 StatusLabel.Font = Enum.Font.SourceSansBold
 StatusLabel.TextScaled = true
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+StatusLabel.Parent = Indicator
 
-local StatusLight = Instance.new("Frame", Indicator)
+local StatusLight = Instance.new("Frame")
 StatusLight.Size = UDim2.new(0, 20, 0, 20)
 StatusLight.Position = UDim2.new(0, 10, 0, 5)
 StatusLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
 StatusLight.BorderSizePixel = 0
+StatusLight.Parent = Indicator
 Instance.new("UICorner", StatusLight).CornerRadius = UDim.new(1, 0)
 
 local function autoQuit(reason)
 	StatusLabel.Text = "DANGER"
 	StatusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 	Indicator.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
+	print("[ANTI-MONITOR] Auto quitting: " .. reason)
 	wait(1)
 	LocalPlayer:Kick("[AUTO-QUIT] " .. reason)
 end
+
+-- Debug print to confirm script runs
+print("[ANTI-MONITOR] Script started.")
 
 Players.PlayerChatted:Connect(function(player, message)
 	local msg = message:lower()
@@ -74,4 +89,5 @@ end
 for _, player in pairs(Players:GetPlayers()) do
 	scanPlayer(player)
 end
+
 Players.PlayerAdded:Connect(scanPlayer)
