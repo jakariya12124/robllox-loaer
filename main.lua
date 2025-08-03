@@ -1,12 +1,13 @@
 --// SETTINGS
 local expectedKey = "9867456297"
 
---// Create GUI
+--// Get player
 local player = game:GetService("Players").LocalPlayer
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.Name = "KeySystem"
 gui.ResetOnSpawn = false
 
+--// Main Frame
 local frame = Instance.new("Frame", gui)
 frame.Size = UDim2.new(0, 350, 0, 220)
 frame.Position = UDim2.new(0.5, -175, 0.5, -110)
@@ -15,14 +16,10 @@ frame.BorderSizePixel = 0
 frame.Active = true
 frame.Draggable = true
 
-local glow = Instance.new("UIStroke", frame)
-glow.Thickness = 2
-glow.Color = Color3.fromRGB(0, 170, 255)
-glow.ApplyStrokeMode = Enum.ApplyStrokeMode.Border
+Instance.new("UIStroke", frame).Color = Color3.fromRGB(0, 170, 255)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
-local corner = Instance.new("UICorner", frame)
-corner.CornerRadius = UDim.new(0, 12)
-
+--// Title
 local title = Instance.new("TextLabel", frame)
 title.Size = UDim2.new(1, -40, 0, 30)
 title.Position = UDim2.new(0, 10, 0, 5)
@@ -33,6 +30,7 @@ title.Font = Enum.Font.GothamBold
 title.TextScaled = true
 title.TextXAlignment = Enum.TextXAlignment.Left
 
+--// Close Button
 local close = Instance.new("TextButton", frame)
 close.Size = UDim2.new(0, 24, 0, 24)
 close.Position = UDim2.new(1, -30, 0, 6)
@@ -45,6 +43,7 @@ close.MouseButton1Click:Connect(function()
 	gui:Destroy()
 end)
 
+--// Key TextBox
 local box = Instance.new("TextBox", frame)
 box.Size = UDim2.new(0.8, 0, 0, 40)
 box.Position = UDim2.new(0.1, 0, 0.4, 0)
@@ -58,6 +57,7 @@ box.BorderSizePixel = 0
 box.TextScaled = true
 Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
 
+--// Unlock Button
 local button = Instance.new("TextButton", frame)
 button.Size = UDim2.new(0.5, 0, 0, 35)
 button.Position = UDim2.new(0.25, 0, 0.65, 0)
@@ -68,6 +68,7 @@ button.TextScaled = true
 button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
 Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
 
+--// Get Key Button
 local getKey = Instance.new("TextButton", frame)
 getKey.Size = UDim2.new(0.5, 0, 0, 30)
 getKey.Position = UDim2.new(0.25, 0, 0.85, 0)
@@ -78,33 +79,14 @@ getKey.TextScaled = true
 getKey.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 Instance.new("UICorner", getKey).CornerRadius = UDim.new(0, 8)
 
-getKey.MouseButton1Click:Connect(function()
-	setclipboard("https://lootdest.org/s?DqH3tKqM")
-	box.PlaceholderText = "Key copied URL 📋"
-end)
-
-button.MouseButton1Click:Connect(function()
-	if box.Text == expectedKey then
-		gui:Destroy()
-		loadAntiMonitorScript()
-	else
-		box.Text = "❌ Invalid Key"
-		wait(1)
-		box.Text = ""
-	end
-end)
-
---// Anti Monitor Script
-function loadAntiMonitorScript()
+--// Anti Monitor Script Function
+local function loadAntiMonitorScript()
 	local Players = game:GetService("Players")
 	local LocalPlayer = Players.LocalPlayer or Players.PlayerAdded:Wait()
 	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 
-	local quitMsgPrefix = "[AUTO-QUIT] "
-
-	local ScreenGui = Instance.new("ScreenGui")
+	local ScreenGui = Instance.new("ScreenGui", PlayerGui)
 	ScreenGui.Name = "AutoQuitStatusGUI"
-	ScreenGui.Parent = PlayerGui
 
 	local Indicator = Instance.new("Frame", ScreenGui)
 	Indicator.Size = UDim2.new(0, 150, 0, 30)
@@ -133,9 +115,8 @@ function loadAntiMonitorScript()
 		StatusLabel.Text = "DANGER"
 		StatusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
 		Indicator.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
-		warn("[ANTI-MONITOR] Auto quitting: " .. reason)
 		wait(1)
-		LocalPlayer:Kick(quitMsgPrefix .. reason)
+		LocalPlayer:Kick("[AUTO-QUIT] " .. reason)
 	end
 
 	Players.PlayerChatted:Connect(function(player, message)
@@ -177,3 +158,23 @@ function loadAntiMonitorScript()
 	end
 	Players.PlayerAdded:Connect(scanPlayer)
 end
+
+--// Get Key Button Logic
+getKey.MouseButton1Click:Connect(function()
+	local success = pcall(function()
+		setclipboard("https://lootdest.org/s?DqH3tKqM")
+	end)
+	box.PlaceholderText = success and "Key copied URL 📋" or "Manual Key URL"
+end)
+
+--// Unlock Button Logic
+button.MouseButton1Click:Connect(function()
+	if box.Text == expectedKey then
+		gui:Destroy()
+		loadAntiMonitorScript()
+	else
+		box.Text = "❌ Invalid Key"
+		wait(1)
+		box.Text = ""
+	end
+end)
