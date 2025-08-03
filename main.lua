@@ -2,9 +2,8 @@ local Players = game:GetService("Players")
 
 local LocalPlayer = Players.LocalPlayer
 if not LocalPlayer then
-	-- Wait for LocalPlayer if script runs too early
-	Players.PlayerAdded:Wait()
-	LocalPlayer = Players.LocalPlayer
+    Players.PlayerAdded:Wait()
+    LocalPlayer = Players.LocalPlayer
 end
 
 local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
@@ -15,14 +14,26 @@ ScreenGui.Name = "AutoQuitStatusGUI"
 ScreenGui.Parent = PlayerGui
 
 local Indicator = Instance.new("Frame")
-Indicator.Size = UDim2.new(0, 150, 0, 30)
+Indicator.Size = UDim2.new(0, 160, 0, 40)
 Indicator.Position = UDim2.new(0, 10, 0, 10)
 Indicator.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
 Indicator.BorderSizePixel = 0
+Indicator.AnchorPoint = Vector2.new(0,0)
 Indicator.Parent = ScreenGui
+Indicator.ZIndex = 10
+
+local StatusLight = Instance.new("Frame")
+StatusLight.Size = UDim2.new(0, 30, 0, 30)
+StatusLight.Position = UDim2.new(0, 5, 0, 5)
+StatusLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Green = SAFE
+StatusLight.BorderSizePixel = 1
+StatusLight.BorderColor3 = Color3.fromRGB(0, 100, 0)
+StatusLight.Parent = Indicator
+StatusLight.ZIndex = 11
+Instance.new("UICorner", StatusLight).CornerRadius = UDim.new(1, 0)
 
 local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -40, 1, 0)
+StatusLabel.Size = UDim2.new(1, -45, 1, 0)
 StatusLabel.Position = UDim2.new(0, 40, 0, 0)
 StatusLabel.BackgroundTransparency = 1
 StatusLabel.Text = "SAFE"
@@ -31,63 +42,55 @@ StatusLabel.Font = Enum.Font.SourceSansBold
 StatusLabel.TextScaled = true
 StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
 StatusLabel.Parent = Indicator
-
-local StatusLight = Instance.new("Frame")
-StatusLight.Size = UDim2.new(0, 20, 0, 20)
-StatusLight.Position = UDim2.new(0, 10, 0, 5)
-StatusLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
-StatusLight.BorderSizePixel = 0
-StatusLight.Parent = Indicator
-Instance.new("UICorner", StatusLight).CornerRadius = UDim.new(1, 0)
+StatusLabel.ZIndex = 11
 
 local function autoQuit(reason)
-	StatusLabel.Text = "DANGER"
-	StatusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
-	Indicator.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
-	print("[ANTI-MONITOR] Auto quitting: " .. reason)
-	wait(1)
-	LocalPlayer:Kick("[AUTO-QUIT] " .. reason)
+    StatusLabel.Text = "DANGER"
+    StatusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red = DANGER
+    Indicator.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
+    print("[ANTI-MONITOR] Auto quitting: " .. reason)
+    wait(1)
+    LocalPlayer:Kick("[AUTO-QUIT] " .. reason)
 end
 
--- Debug print to confirm script runs
 print("[ANTI-MONITOR] Script started.")
 
 Players.PlayerChatted:Connect(function(player, message)
-	local msg = message:lower()
-	if player ~= LocalPlayer and (msg:find(LocalPlayer.Name:lower()) or msg:find("report")) then
-		autoQuit("Suspicious chat message detected")
-	end
+    local msg = message:lower()
+    if player ~= LocalPlayer and (msg:find(LocalPlayer.Name:lower()) or msg:find("report")) then
+        autoQuit("Suspicious chat message detected")
+    end
 end)
 
 local suspiciousKeywords = { "mod", "admin", "camera", "record", "staff", "monitor", "log" }
 
 local function isSuspiciousName(name)
-	local lname = name:lower()
-	for _, keyword in pairs(suspiciousKeywords) do
-		if lname:find(keyword) then
-			return true
-		end
-	end
-	return false
+    local lname = name:lower()
+    for _, keyword in pairs(suspiciousKeywords) do
+        if lname:find(keyword) then
+            return true
+        end
+    end
+    return false
 end
 
 local function scanPlayer(player)
-	if player == LocalPlayer then return end
-	if isSuspiciousName(player.Name) or isSuspiciousName(player.DisplayName) then
-		autoQuit("Suspicious player name detected: " .. player.Name)
-	end
+    if player == LocalPlayer then return end
+    if isSuspiciousName(player.Name) or isSuspiciousName(player.DisplayName) then
+        autoQuit("Suspicious player name detected: " .. player.Name)
+    end
 
-	player.CharacterAdded:Connect(function(char)
-		wait(2)
-		local hrp = char:FindFirstChild("HumanoidRootPart")
-		if not hrp or (hrp.Transparency >= 2) then
-			autoQuit("Invisible player character (monitor bot?) detected.")
-		end
-	end)
+    player.CharacterAdded:Connect(function(char)
+        wait(2)
+        local hrp = char:FindFirstChild("HumanoidRootPart")
+        if not hrp or (hrp.Transparency >= 2) then
+            autoQuit("Invisible player character (monitor bot?) detected.")
+        end
+    end)
 end
 
 for _, player in pairs(Players:GetPlayers()) do
-	scanPlayer(player)
+    scanPlayer(player)
 end
 
 Players.PlayerAdded:Connect(scanPlayer)
