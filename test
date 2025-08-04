@@ -9,11 +9,18 @@ local MAX_WARNINGS = 3
 local CHECK_INTERVAL = 1
 local DISTANCE_THRESHOLD = 60
 
--- Create GUI
+-- Wait until PlayerGui is ready
+local playerGui
+repeat
+	playerGui = player:FindFirstChild("PlayerGui")
+	wait(0.1)
+until playerGui
+
+-- Create GUI safely
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AntiESP_ToggleGui"
 screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
+screenGui.Parent = playerGui
 
 local frame = Instance.new("Frame")
 frame.Size = UDim2.new(0, 180, 0, 50)
@@ -77,12 +84,15 @@ local function warn()
 	warn("[ANTI-ESP] Warning " .. warnings .. " — suspicious ESP detected!")
 
 	if warnings >= MAX_WARNINGS then
-		player:Kick("Anti-ESP kicked you for suspicious behavior.")
+		-- Kick yourself safely
+		pcall(function()
+			player:Kick("Anti-ESP kicked you for suspicious behavior.")
+		end)
 	end
 end
 
 local lastCheck = 0
-RunService.Heartbeat:Connect(function(dt)
+RunService.RenderStepped:Connect(function(dt)
 	if not enabled then return end
 	lastCheck = lastCheck + dt
 	if lastCheck < CHECK_INTERVAL then return end
@@ -96,7 +106,7 @@ RunService.Heartbeat:Connect(function(dt)
 			local dist = (char1.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
 
 			-- Remove ESP visuals locally
-			stripVisualESPTools(other.Character)
+			pcall(stripVisualESPTools, other.Character)
 
 			if dist > DISTANCE_THRESHOLD then
 				if hasLineOfSight(other) then
