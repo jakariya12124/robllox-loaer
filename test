@@ -1,148 +1,90 @@
+--// FULL ANTI-DETECT STEALTH FLY SCRIPT BUNDLE
 local Players = game:GetService("Players")
-local Workspace = game:GetService("Workspace")
+local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
-local enabled = false
-local warnings = 0
-local MAX_WARNINGS = 3
-local CHECK_INTERVAL = 1.5
-local DISTANCE_THRESHOLD = 60
+local char = player.Character or player.CharacterAdded:Wait()
+local hrp = char:WaitForChild("HumanoidRootPart")
+local hum = char:WaitForChild("Humanoid")
 
-local lastCheckTime = 0
+-- SETTINGS
+local flySpeed = 0.6 -- smooth speed
+local liftPower = 1.2 -- vertical float
+local teleportTweenSteps = 10
 
--- GUI Setup (same as before)
-local playerGui = player:WaitForChild("PlayerGui")
+-- FLY TOGGLE
+local flying = false
+local lastTap = 0
 
-local screenGui = playerGui:FindFirstChild("AntiESP_ToggleGui")
-if not screenGui then
-	screenGui = Instance.new("ScreenGui")
-	screenGui.Name = "AntiESP_ToggleGui"
-	screenGui.ResetOnSpawn = false
-	screenGui.Parent = playerGui
-end
-
-local oldFrame = screenGui:FindFirstChild("MainFrame")
-if oldFrame then oldFrame:Destroy() end
-
-local frame = Instance.new("Frame")
-frame.Name = "MainFrame"
-frame.Size = UDim2.new(0, 180, 0, 50)
-frame.Position = UDim2.new(1, -190, 0, 20)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BorderSizePixel = 0
-frame.BackgroundTransparency = 0.15
-frame.Parent = screenGui
-frame.AnchorPoint = Vector2.new(1, 0)
-frame.Active = true
-frame.Draggable = true
-
-local stroke = Instance.new("UIStroke")
-stroke.Color = Color3.fromRGB(0, 200, 255)
-stroke.Thickness = 2
-stroke.Parent = frame
-
-local toggleBtn = Instance.new("TextButton")
-toggleBtn.Size = UDim2.new(1, 0, 1, 0)
-toggleBtn.Position = UDim2.new(0, 0, 0, 0)
-toggleBtn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
-toggleBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
-toggleBtn.Font = Enum.Font.GothamBold
-toggleBtn.TextSize = 16
-toggleBtn.Text = "Activate Anti-ESP"
-toggleBtn.AutoButtonColor = true
-toggleBtn.BorderSizePixel = 0
-toggleBtn.Parent = frame
-
--- Only remove exploit ESP marked with this attribute
-local EXPLOIT_ESP_TAG = "ExploitESP"
-
-local function stripExploitESP(character)
-	for _, v in ipairs(character:GetDescendants()) do
-		if (v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment")) and v:GetAttribute(EXPLOIT_ESP_TAG) then
-			pcall(function() v:Destroy() end)
+--// ========== DOUBLE-TAP TO FLY ==========
+UIS.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.Touch then
+		local now = tick()
+		if now - lastTap < 0.4 then
+			flying = not flying
+			hum.PlatformStand = flying
 		end
+		lastTap = now
+	end
+end)
+
+--// ========== FLY LOOP ==========
+RunService.RenderStepped:Connect(function()
+	if flying and hrp and hum.Health > 0 then
+		local dir = hum.MoveDirection
+		hrp.CFrame = hrp.CFrame + (dir * flySpeed) + Vector3.new(0, liftPower * 0.05, 0)
+	end
+end)
+
+--// ========== SAFE TELEPORT FUNCTION ==========
+function safeTeleport(pos)
+	for i = 1, teleportTweenSteps do
+		if not hrp then return end
+		local stepPos = hrp.Position:Lerp(pos, i / teleportTweenSteps)
+		hrp.CFrame = CFrame.new(stepPos)
+		task.wait(0.03)
 	end
 end
 
--- Optional: Mark all ESP highlights as exploit for test (remove this if you want)
---[[
-for _, plr in ipairs(Players:GetPlayers()) do
-	if plr.Character then
-		for _, v in ipairs(plr.Character:GetDescendants()) do
-			if v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment") then
-				v:SetAttribute(EXPLOIT_ESP_TAG, true)
-			end
-		end
+-- Example (optional use):
+-- safeTeleport(Vector3.new(100, 60, 200))
+
+--// ========== ANTI-KICK ==========
+local mt = getrawmetatable(game)
+setreadonly(mt, false)
+local oldNamecall = mt.__namecall
+mt.__namecall = newcclosure(function(self, ...)
+	local method = getnamecallmethod()
+	if method == "Kick" or method == "kick" then
+		warn("[ANTI-KICK] Server tried to kick you. Blocked.")
+		return nil
 	end
-end
-]]
+	return oldNamecall(self, ...)
+end)
 
-local function hasLineOfSight(target)
-	local char1 = player.Character
-	local char2 = target.Character
-	if not (char1 and char2) then return false end
-
-	local hrp1 = char1:FindFirstChild("HumanoidRootPart")
-	local hrp2 = char2:FindFirstChild("HumanoidRootPart")
-	if not (hrp1 and hrp2) then return false end
-
-	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {char1}
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-	local ok, result = pcall(function()
-		return Workspace:Raycast(hrp1.Position, hrp2.Position - hrp1.Position, rayParams)
-	end)
-
-	if not ok or not result then return false end
-	return char2:IsAncestorOf(result.Instance)
-end
-
-local function warn()
-	warnings = warnings + 1
-	warn("[ANTI-ESP] Warning " .. warnings .. " — suspicious ESP detected!")
-
-	if warnings >= MAX_WARNINGS then
-		pcall(function()
-			player:Kick("Anti-ESP kicked you for suspicious behavior.")
-		end)
-	end
-end
-
-RunService.RenderStepped:Connect(function(dt)
-	if not enabled then return end
-	lastCheckTime = lastCheckTime + dt
-	if lastCheckTime < CHECK_INTERVAL then return end
-	lastCheckTime = 0
-
-	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
-	local char1 = player.Character
-
-	for _, other in ipairs(Players:GetPlayers()) do
-		if other ~= player and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
-			local dist = (char1.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
-
-			-- Only strip exploit ESP marked by attribute, so normal visuals stay
-			pcall(stripExploitESP, other.Character)
-
-			if dist > DISTANCE_THRESHOLD then
-				if hasLineOfSight(other) then
-					warn()
+--// ========== BLOCK KNOWN REMOTES ==========
+local blockedNames = {"kick", "ban", "cheat", "detect", "flag", "log", "punish"}
+for _, obj in ipairs(getgc(true)) do
+	if typeof(obj) == "table" then
+		for k, v in pairs(obj) do
+			if typeof(v) == "function" and typeof(k) == "string" then
+				for _, b in ipairs(blockedNames) do
+					if k:lower():find(b) then
+						obj[k] = function(...) return nil end
+						warn("[ANTI-REMOTE] Blocked function:", k)
+					end
 				end
 			end
 		end
 	end
-end)
+end
 
-toggleBtn.MouseButton1Click:Connect(function()
-	enabled = not enabled
-	if enabled then
-		toggleBtn.Text = "Disable Anti-ESP"
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
-	else
-		toggleBtn.Text = "Activate Anti-ESP"
-		toggleBtn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
-		warnings = 0
+--// OPTIONAL: DELETE RADAR GUI IF EXISTS
+for _, v in pairs(player.PlayerGui:GetDescendants()) do
+	if v:IsA("LocalScript") and tostring(v.Name):lower():find("radar") then
+		v:Destroy()
 	end
-end)
+end
