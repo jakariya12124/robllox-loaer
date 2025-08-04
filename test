@@ -1,5 +1,4 @@
 -- Valex-Style Fly with Auto-Reactivate After Death + Futuristic GUI + Speed Slider
-
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 local UserInputService = game:GetService("UserInputService")
@@ -8,7 +7,7 @@ local player = Players.LocalPlayer
 
 -- Settings
 local flying = false
-local speed = 60 -- start at minimum speed 60
+local speed = 60 -- minimum speed 60
 local gravityPull = -8
 
 local bv, bg, humanoid, root
@@ -182,15 +181,20 @@ RunService.RenderStepped:Connect(function()
 		local cam = workspace.CurrentCamera
 		local move = humanoid.MoveDirection
 
-		-- Use camera's look direction for orientation
+		-- Set gyro to camera orientation
 		bg.CFrame = cam.CFrame
 
 		local velocity = Vector3.zero
-		if move.Magnitude > 0 then
-			local dir = cam.CFrame:VectorToWorldSpace(move.Unit)
-			velocity = dir.Unit * speed
+
+		-- Calculate movement relative to camera
+		local camLook = cam.CFrame.LookVector
+		local camRight = cam.CFrame.RightVector
+		local moveDirection = (camLook * move.Z) + (camRight * move.X)
+
+		if moveDirection.Magnitude > 0 then
+			velocity = moveDirection.Unit * speed
 		else
-			-- Slight vertical lift to prevent falling if idle
+			-- Slight upward lift to prevent fall when idle
 			velocity = Vector3.new(0, 0.1, 0)
 		end
 
