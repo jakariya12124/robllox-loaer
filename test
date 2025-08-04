@@ -1,13 +1,13 @@
---// Services
+-- Services
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 local character = player.Character or player.CharacterAdded:Wait()
-local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 local humanoid = character:WaitForChild("Humanoid")
+local root = character:WaitForChild("HumanoidRootPart")
 
---// GUI
+-- GUI
 local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
 gui.Name = "FlyGui"
 gui.ResetOnSpawn = false
@@ -29,53 +29,63 @@ button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 button.Font = Enum.Font.GothamBold
 button.TextScaled = true
 
---// Fly Logic
+-- Variables
 local flying = false
 local bv, bg
 local speed = 50
+local gravityPull = -8 -- simulate gravity pull
+
+-- Create force
+local function startFlying()
+	bv = Instance.new("BodyVelocity")
+	bv.Name = "FlyVelocity"
+	bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+	bv.P = 125000
+	bv.Velocity = Vector3.zero
+	bv.Parent = root
+
+	bg = Instance.new("BodyGyro")
+	bg.Name = "FlyGyro"
+	bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+	bg.P = 50000
+	bg.CFrame = workspace.CurrentCamera.CFrame
+	bg.Parent = root
+
+	humanoid.PlatformStand = true
+end
+
+local function stopFlying()
+	if bv then bv:Destroy(); bv = nil end
+	if bg then bg:Destroy(); bg = nil end
+	humanoid.PlatformStand = false
+end
 
 button.MouseButton1Click:Connect(function()
 	flying = not flying
 	button.Text = "Fly: " .. (flying and "ON" or "OFF")
-
+	
 	if flying then
-		-- Add BodyVelocity
-		bv = Instance.new("BodyVelocity")
-		bv.MaxForce = Vector3.new(1e6, 1e6, 1e6) -- High force to block gravity
-		bv.Velocity = Vector3.zero
-		bv.P = 125000
-		bv.Name = "FlyVelocity"
-		bv.Parent = humanoidRootPart
-
-		-- Add BodyGyro
-		bg = Instance.new("BodyGyro")
-		bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-		bg.CFrame = workspace.CurrentCamera.CFrame
-		bg.P = 50000
-		bg.Name = "FlyGyro"
-		bg.Parent = humanoidRootPart
-
-		humanoid.PlatformStand = true
+		startFlying()
 	else
-		if bv then bv:Destroy() end
-		if bg then bg:Destroy() end
-		humanoid.PlatformStand = false
+		stopFlying()
 	end
 end)
 
---// Flight Movement Update
+-- Flight Loop
 RunService.RenderStepped:Connect(function()
-	if flying and bv and bg and humanoidRootPart then
-		local moveDir = humanoid.MoveDirection
+	if flying and bv and bg then
+		local move = humanoid.MoveDirection
 		local cam = workspace.CurrentCamera
-
 		bg.CFrame = cam.CFrame
 
-		if moveDir.Magnitude > 0 then
-			local dir = cam.CFrame:VectorToWorldSpace(moveDir.Unit)
-			bv.Velocity = dir * speed + Vector3.new(0, 1, 0) -- Add upward float
-		else
-			bv.Velocity = Vector3.new(0, 1, 0.1) -- Constant gentle float to stop micro fall
+		local velocity = Vector3.zero
+		if move.Magnitude > 0 then
+			local dir = cam.CFrame:VectorToWorldSpace(move.Unit)
+			velocity = dir * speed
 		end
+
+		-- Apply small gravity pull even while flying
+		velocity = velocity + Vector3.new(0, gravityPull, 0)
+		bv.Velocity = velocity
 	end
 end)
