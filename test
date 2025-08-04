@@ -2,6 +2,7 @@
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
+local UserInputService = game:GetService("UserInputService")
 
 local player = Players.LocalPlayer
 
@@ -70,7 +71,7 @@ sliderBg.Parent = speedContainer
 
 -- Slider fill bar
 local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new( (speed - 60)/140 , 0, 1, 0) -- initial fill relative to speed (range 60-200)
+sliderFill.Size = UDim2.new((speed - 60) / 140, 0, 1, 0) -- initial fill relative to speed (range 60-200)
 sliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
 sliderFill.BorderSizePixel = 0
 sliderFill.Parent = sliderBg
@@ -126,7 +127,7 @@ end)
 
 RunService.RenderStepped:Connect(function()
 	if dragging then
-		local mouseLocation = game:GetService("UserInputService"):GetMouseLocation()
+		local mouseLocation = UserInputService:GetMouseLocation()
 		updateSlider(mouseLocation.X)
 	end
 end)
@@ -134,9 +135,10 @@ end)
 -- Fly start/stop functions
 local function startFlying()
 	if not root or not humanoid then return end
+
 	if not bv or not bv.Parent then
 		bv = Instance.new("BodyVelocity")
-		bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+		bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
 		bv.P = 125000
 		bv.Name = "FlyVelocity"
 		bv.Velocity = Vector3.zero
@@ -145,7 +147,7 @@ local function startFlying()
 
 	if not bg or not bg.Parent then
 		bg = Instance.new("BodyGyro")
-		bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+		bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
 		bg.P = 50000
 		bg.CFrame = workspace.CurrentCamera.CFrame
 		bg.Name = "FlyGyro"
@@ -162,7 +164,7 @@ local function stopFlying()
 	if humanoid then humanoid.PlatformStand = false end
 end
 
--- Button click
+-- Button click toggle
 button.MouseButton1Click:Connect(function()
 	flying = not flying
 	button.Text = "Fly: " .. (flying and "ON" or "OFF")
@@ -179,11 +181,17 @@ RunService.RenderStepped:Connect(function()
 	if flying and humanoid and root and bv and bg then
 		local cam = workspace.CurrentCamera
 		local move = humanoid.MoveDirection
-		bg.CFrame = CFrame.new(root.Position, root.Position + cam.CFrame.LookVector)
+
+		-- Use camera's look direction for orientation
+		bg.CFrame = cam.CFrame
 
 		local velocity = Vector3.zero
 		if move.Magnitude > 0 then
-			velocity = move.Unit * speed
+			local dir = cam.CFrame:VectorToWorldSpace(move.Unit)
+			velocity = dir.Unit * speed
+		else
+			-- Slight vertical lift to prevent falling if idle
+			velocity = Vector3.new(0, 0.1, 0)
 		end
 
 		velocity = velocity + Vector3.new(0, gravityPull, 0)
@@ -191,18 +199,19 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
--- Setup character
+-- Setup character and fly on respawn if needed
 local function setupCharacter(char)
-	humanoid = char:WaitForChild("Humanoid")
-	root = char:WaitForChild("HumanoidRootPart")
+	task.spawn(function()
+		humanoid = char:WaitForChild("Humanoid")
+		root = char:WaitForChild("HumanoidRootPart")
 
-	if flying then
-		task.wait(0.1)
-		startFlying()
-	end
+		task.wait(0.3) -- wait a bit to ensure everything loads
+		if flying then
+			startFlying()
+		end
+	end)
 end
 
--- Respawn handler
 player.CharacterAdded:Connect(function(char)
 	stopFlying()
 	setupCharacter(char)
