@@ -1,37 +1,43 @@
---// FULL ANTI-DETECT STEALTH FLY SCRIPT BUNDLE
+--// FULL ANTI-DETECT FLY WITH GUI BUTTON
+
 local Players = game:GetService("Players")
 local UIS = game:GetService("UserInputService")
 local RunService = game:GetService("RunService")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 
 local player = Players.LocalPlayer
 local char = player.Character or player.CharacterAdded:Wait()
 local hrp = char:WaitForChild("HumanoidRootPart")
 local hum = char:WaitForChild("Humanoid")
 
--- SETTINGS
-local flySpeed = 0.6 -- smooth speed
-local liftPower = 1.2 -- vertical float
-local teleportTweenSteps = 10
+local flySpeed = 0.6
+local liftPower = 1.2
 
--- FLY TOGGLE
 local flying = false
-local lastTap = 0
 
---// ========== DOUBLE-TAP TO FLY ==========
-UIS.InputBegan:Connect(function(input, gpe)
-	if gpe then return end
-	if input.KeyCode == Enum.KeyCode.Space or input.UserInputType == Enum.UserInputType.Touch then
-		local now = tick()
-		if now - lastTap < 0.4 then
-			flying = not flying
-			hum.PlatformStand = flying
-		end
-		lastTap = now
-	end
+-- Create GUI
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "FlyGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
+local flyButton = Instance.new("TextButton")
+flyButton.Size = UDim2.new(0, 100, 0, 50)
+flyButton.Position = UDim2.new(0.05, 0, 0.85, 0)
+flyButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
+flyButton.TextColor3 = Color3.new(1, 1, 1)
+flyButton.Text = "Fly: OFF"
+flyButton.Font = Enum.Font.SourceSansBold
+flyButton.TextSize = 22
+flyButton.AutoButtonColor = true
+flyButton.Parent = screenGui
+
+flyButton.MouseButton1Click:Connect(function()
+	flying = not flying
+	hum.PlatformStand = flying
+	flyButton.Text = flying and "Fly: ON" or "Fly: OFF"
 end)
 
---// ========== FLY LOOP ==========
+-- Fly loop
 RunService.RenderStepped:Connect(function()
 	if flying and hrp and hum.Health > 0 then
 		local dir = hum.MoveDirection
@@ -39,20 +45,7 @@ RunService.RenderStepped:Connect(function()
 	end
 end)
 
---// ========== SAFE TELEPORT FUNCTION ==========
-function safeTeleport(pos)
-	for i = 1, teleportTweenSteps do
-		if not hrp then return end
-		local stepPos = hrp.Position:Lerp(pos, i / teleportTweenSteps)
-		hrp.CFrame = CFrame.new(stepPos)
-		task.wait(0.03)
-	end
-end
-
--- Example (optional use):
--- safeTeleport(Vector3.new(100, 60, 200))
-
---// ========== ANTI-KICK ==========
+-- ANTI-KICK
 local mt = getrawmetatable(game)
 setreadonly(mt, false)
 local oldNamecall = mt.__namecall
@@ -65,7 +58,7 @@ mt.__namecall = newcclosure(function(self, ...)
 	return oldNamecall(self, ...)
 end)
 
---// ========== BLOCK KNOWN REMOTES ==========
+-- BLOCK COMMON REMOTES
 local blockedNames = {"kick", "ban", "cheat", "detect", "flag", "log", "punish"}
 for _, obj in ipairs(getgc(true)) do
 	if typeof(obj) == "table" then
@@ -79,12 +72,5 @@ for _, obj in ipairs(getgc(true)) do
 				end
 			end
 		end
-	end
-end
-
---// OPTIONAL: DELETE RADAR GUI IF EXISTS
-for _, v in pairs(player.PlayerGui:GetDescendants()) do
-	if v:IsA("LocalScript") and tostring(v.Name):lower():find("radar") then
-		v:Destroy()
 	end
 end
