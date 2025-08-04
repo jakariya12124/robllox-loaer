@@ -1,76 +1,272 @@
---// FULL ANTI-DETECT FLY WITH GUI BUTTON
-
+--// SETTINGS
+local expectedKey = "9867456297"
 local Players = game:GetService("Players")
-local UIS = game:GetService("UserInputService")
+local LocalPlayer = Players.LocalPlayer
 local RunService = game:GetService("RunService")
+local CoreGui = game:GetService("CoreGui")
 
-local player = Players.LocalPlayer
-local char = player.Character or player.CharacterAdded:Wait()
-local hrp = char:WaitForChild("HumanoidRootPart")
-local hum = char:WaitForChild("Humanoid")
+--// GUI Setup
+local gui = Instance.new("ScreenGui", LocalPlayer:WaitForChild("PlayerGui"))
+gui.Name = "KeySystem"
+gui.ResetOnSpawn = false
 
-local flySpeed = 0.6
-local liftPower = 1.2
+local frame = Instance.new("Frame", gui)
+frame.Size = UDim2.new(0, 350, 0, 220)
+frame.Position = UDim2.new(0.5, -175, 0.5, -110)
+frame.BackgroundColor3 = Color3.fromRGB(15, 15, 25)
+frame.BorderSizePixel = 0
+frame.Active = true
+frame.Draggable = true
+Instance.new("UIStroke", frame).Color = Color3.fromRGB(0, 170, 255)
+Instance.new("UICorner", frame).CornerRadius = UDim.new(0, 12)
 
-local flying = false
+local title = Instance.new("TextLabel", frame)
+title.Size = UDim2.new(1, -40, 0, 30)
+title.Position = UDim2.new(0, 10, 0, 5)
+title.Text = "🔐 Futuristic Key System"
+title.BackgroundTransparency = 1
+title.TextColor3 = Color3.fromRGB(0, 200, 255)
+title.Font = Enum.Font.GothamBold
+title.TextScaled = true
+title.TextXAlignment = Enum.TextXAlignment.Left
 
--- Create GUI
-local screenGui = Instance.new("ScreenGui")
-screenGui.Name = "FlyGui"
-screenGui.ResetOnSpawn = false
-screenGui.Parent = player:WaitForChild("PlayerGui")
-
-local flyButton = Instance.new("TextButton")
-flyButton.Size = UDim2.new(0, 100, 0, 50)
-flyButton.Position = UDim2.new(0.05, 0, 0.85, 0)
-flyButton.BackgroundColor3 = Color3.fromRGB(35, 35, 35)
-flyButton.TextColor3 = Color3.new(1, 1, 1)
-flyButton.Text = "Fly: OFF"
-flyButton.Font = Enum.Font.SourceSansBold
-flyButton.TextSize = 22
-flyButton.AutoButtonColor = true
-flyButton.Parent = screenGui
-
-flyButton.MouseButton1Click:Connect(function()
-	flying = not flying
-	hum.PlatformStand = flying
-	flyButton.Text = flying and "Fly: ON" or "Fly: OFF"
+local close = Instance.new("TextButton", frame)
+close.Size = UDim2.new(0, 24, 0, 24)
+close.Position = UDim2.new(1, -30, 0, 6)
+close.Text = "✖"
+close.TextColor3 = Color3.fromRGB(255, 80, 80)
+close.BackgroundTransparency = 1
+close.Font = Enum.Font.GothamBold
+close.TextScaled = true
+close.MouseButton1Click:Connect(function()
+	gui:Destroy()
 end)
 
--- Fly loop
-RunService.RenderStepped:Connect(function()
-	if flying and hrp and hum.Health > 0 then
-		local dir = hum.MoveDirection
-		hrp.CFrame = hrp.CFrame + (dir * flySpeed) + Vector3.new(0, liftPower * 0.05, 0)
+local box = Instance.new("TextBox", frame)
+box.Size = UDim2.new(0.8, 0, 0, 40)
+box.Position = UDim2.new(0.1, 0, 0.4, 0)
+box.PlaceholderText = "Enter Access Key..."
+box.Text = ""
+box.Font = Enum.Font.Gotham
+box.TextSize = 20
+box.TextColor3 = Color3.fromRGB(255, 255, 255)
+box.BackgroundColor3 = Color3.fromRGB(20, 20, 30)
+box.BorderSizePixel = 0
+box.TextScaled = true
+Instance.new("UICorner", box).CornerRadius = UDim.new(0, 8)
+
+local button = Instance.new("TextButton", frame)
+button.Size = UDim2.new(0.5, 0, 0, 35)
+button.Position = UDim2.new(0.25, 0, 0.65, 0)
+button.Text = "UNLOCK"
+button.Font = Enum.Font.GothamBold
+button.TextColor3 = Color3.fromRGB(255, 255, 255)
+button.TextScaled = true
+button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+Instance.new("UICorner", button).CornerRadius = UDim.new(0, 10)
+
+local getKey = Instance.new("TextButton", frame)
+getKey.Size = UDim2.new(0.5, 0, 0, 30)
+getKey.Position = UDim2.new(0.25, 0, 0.85, 0)
+getKey.Text = "🔑 Get Key"
+getKey.Font = Enum.Font.GothamSemibold
+getKey.TextColor3 = Color3.fromRGB(255, 255, 255)
+getKey.TextScaled = true
+getKey.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
+Instance.new("UICorner", getKey).CornerRadius = UDim.new(0, 8)
+
+--// Anti Monitor GUI + AutoQuit
+local function loadAntiMonitorScript()
+	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+	local ScreenGui = Instance.new("ScreenGui", PlayerGui)
+	ScreenGui.Name = "AutoQuitStatusGUI"
+
+	local Indicator = Instance.new("Frame", ScreenGui)
+	Indicator.Size = UDim2.new(0, 150, 0, 30)
+	Indicator.Position = UDim2.new(0, 10, 0, 10)
+	Indicator.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
+	Indicator.BorderSizePixel = 0
+
+	local StatusLabel = Instance.new("TextLabel", Indicator)
+	StatusLabel.Size = UDim2.new(1, -40, 1, 0)
+	StatusLabel.Position = UDim2.new(0, 40, 0, 0)
+	StatusLabel.BackgroundTransparency = 1
+	StatusLabel.Text = "SAFE"
+	StatusLabel.TextColor3 = Color3.new(0, 0, 0)
+	StatusLabel.Font = Enum.Font.SourceSansBold
+	StatusLabel.TextScaled = true
+	StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
+
+	local StatusLight = Instance.new("Frame", Indicator)
+	StatusLight.Size = UDim2.new(0, 20, 0, 20)
+	StatusLight.Position = UDim2.new(0, 10, 0, 5)
+	StatusLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0)
+	StatusLight.BorderSizePixel = 0
+	Instance.new("UICorner", StatusLight).CornerRadius = UDim.new(1, 0)
+
+	local function autoQuit(reason)
+		StatusLabel.Text = "DANGER"
+		StatusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0)
+		Indicator.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
+		wait(1)
+		LocalPlayer:Kick("[AUTO-QUIT] " .. reason)
 	end
-end)
 
--- ANTI-KICK
-local mt = getrawmetatable(game)
-setreadonly(mt, false)
-local oldNamecall = mt.__namecall
-mt.__namecall = newcclosure(function(self, ...)
-	local method = getnamecallmethod()
-	if method == "Kick" or method == "kick" then
-		warn("[ANTI-KICK] Server tried to kick you. Blocked.")
-		return nil
+	Players.PlayerChatted:Connect(function(player, message)
+		local msg = message:lower()
+		if player ~= LocalPlayer and (msg:find(LocalPlayer.Name:lower()) or msg:find("report")) then
+			autoQuit("Suspicious chat message detected")
+		end
+	end)
+
+	local suspiciousKeywords = { "mod", "admin", "camera", "record", "staff", "monitor", "log" }
+
+	local function isSuspiciousName(name)
+		local lname = name:lower()
+		for _, keyword in pairs(suspiciousKeywords) do
+			if lname:find(keyword) then
+				return true
+			end
+		end
+		return false
 	end
-	return oldNamecall(self, ...)
+
+	local function scanPlayer(player)
+		if player == LocalPlayer then return end
+		if isSuspiciousName(player.Name) or isSuspiciousName(player.DisplayName) then
+			autoQuit("Suspicious player name detected: " .. player.Name)
+		end
+
+		player.CharacterAdded:Connect(function(char)
+			wait(2)
+			local hrp = char:FindFirstChild("HumanoidRootPart")
+			if not hrp or (hrp.Transparency >= 2) then
+				autoQuit("Invisible player character (monitor bot?) detected.")
+			end
+		end)
+	end
+
+	for _, player in pairs(Players:GetPlayers()) do
+		scanPlayer(player)
+	end
+	Players.PlayerAdded:Connect(scanPlayer)
+end
+
+--// Get Key Clipboard Logic
+getKey.MouseButton1Click:Connect(function()
+	local success = pcall(function()
+		setclipboard("https://lootdest.org/s?DqH3tKqM")
+	end)
+	box.PlaceholderText = success and "Key copied URL 📋" or "Manual Key URL"
 end)
 
--- BLOCK COMMON REMOTES
-local blockedNames = {"kick", "ban", "cheat", "detect", "flag", "log", "punish"}
-for _, obj in ipairs(getgc(true)) do
-	if typeof(obj) == "table" then
-		for k, v in pairs(obj) do
-			if typeof(v) == "function" and typeof(k) == "string" then
-				for _, b in ipairs(blockedNames) do
-					if k:lower():find(b) then
-						obj[k] = function(...) return nil end
-						warn("[ANTI-REMOTE] Blocked function:", k)
+--// UNLOCK BUTTON → Run full protection
+button.MouseButton1Click:Connect(function()
+	if box.Text == expectedKey then
+		gui:Destroy()
+		loadAntiMonitorScript()
+
+		-- RUN FULL ANTI SCRIPT
+		local lastPos = nil
+		RunService.Heartbeat:Connect(function()
+			pcall(function()
+				local hrp = LocalPlayer.Character and LocalPlayer.Character:FindFirstChild("HumanoidRootPart")
+				if hrp then
+					if lastPos then
+						local delta = (hrp.Position - lastPos).magnitude
+						if delta > 50 then
+							LocalPlayer:Kick("Unnatural movement detected.")
+						end
+					end
+					lastPos = hrp.Position
+				end
+			end)
+		end)
+
+		local knownExploits = {"syn", "fluxus", "electron", "valyse", "elysian", "krnl", "delta", "oxygen"}
+		for _, v in pairs(getfenv or debug.getregistry and debug.getregistry()) do
+			for _, keyword in ipairs(knownExploits) do
+				if typeof(v) == "string" and v:lower():find(keyword) then
+					LocalPlayer:Kick("Executor detected.")
+				end
+			end
+		end
+
+		RunService.Stepped:Connect(function()
+			if CoreGui:FindFirstChild("RemoteSpy") or CoreGui:FindFirstChild("Dex") or CoreGui:FindFirstChild("SimpleSpy") then
+				LocalPlayer:Kick("RemoteSpy detected.")
+			end
+			for _, gui in pairs(CoreGui:GetChildren()) do
+				if gui:IsA("ScreenGui") then
+					local name = gui.Name:lower()
+					if name:find("dex") or name:find("spy") or name:find("explorer") or name:find("infinite") then
+						LocalPlayer:Kick("Suspicious GUI detected.")
+					end
+				end
+			end
+		end)
+
+		RunService.Heartbeat:Connect(function()
+			local success, _ = pcall(function() task.wait() end)
+			if not success then
+				LocalPlayer:Kick("Crash attempt detected.")
+			end
+		end)
+
+		LocalPlayer.Idled:Connect(function()
+			LocalPlayer:Kick("Idle kick bypass detected.")
+		end)
+
+		if hookfunction then
+			local oldWait = wait
+			hookfunction(wait, function(...) return oldWait(...) end)
+		end
+
+		if getgenv then
+			local suspiciousKeys = {"fly", "speed", "esp", "aimbot", "noclip", "god", "key"}
+			for k, v in pairs(getgenv()) do
+				if typeof(k) == "string" and typeof(v) == "function" then
+					for _, keyword in ipairs(suspiciousKeys) do
+						if k:lower():find(keyword) then
+							LocalPlayer:Kick("getgenv function detected: " .. k)
+						end
 					end
 				end
 			end
 		end
+
+		-- SIMPLE ANTI-KICK + ANTI-REMOTE
+		local mt = getrawmetatable(game)
+		setreadonly(mt, false)
+		local oldNamecall = mt.__namecall
+		mt.__namecall = newcclosure(function(self, ...)
+			local method = getnamecallmethod()
+			if method == "Kick" or method == "kick" then
+				warn("[ANTI-KICK] Server tried to kick you. Blocked.")
+				return nil
+			end
+			return oldNamecall(self, ...)
+		end)
+
+		local blockedNames = {"kick", "ban", "cheat", "detect", "flag", "log", "punish"}
+		for _, obj in ipairs(getgc(true)) do
+			if typeof(obj) == "table" then
+				for k, v in pairs(obj) do
+					if typeof(v) == "function" and typeof(k) == "string" then
+						for _, b in ipairs(blockedNames) do
+							if k:lower():find(b) then
+								obj[k] = function(...) return nil end
+								warn("[ANTI-REMOTE] Blocked function:", k)
+							end
+						end
+					end
+				end
+			end
+		end
+
+	else
+		box.Text = "❌ Invalid Key"
+		wait(1)
+		box.Text = ""
 	end
-end
+end)
