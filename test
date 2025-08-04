@@ -1,96 +1,82 @@
+--// Services
 local Players = game:GetService("Players")
+local UserInputService = game:GetService("UserInputService")
+local RunService = game:GetService("RunService")
 
-local LocalPlayer = Players.LocalPlayer
-if not LocalPlayer then
-    Players.PlayerAdded:Wait()
-    LocalPlayer = Players.LocalPlayer
-end
+local player = Players.LocalPlayer
+local character = player.Character or player.CharacterAdded:Wait()
+local humanoidRootPart = character:WaitForChild("HumanoidRootPart")
 
-local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
+--// GUI
+local screenGui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+screenGui.Name = "MobileFlyGui"
+screenGui.ResetOnSpawn = false
 
--- Create GUI
-local ScreenGui = Instance.new("ScreenGui")
-ScreenGui.Name = "AutoQuitStatusGUI"
-ScreenGui.Parent = PlayerGui
+local mainFrame = Instance.new("Frame", screenGui)
+mainFrame.Size = UDim2.new(0, 120, 0, 50)
+mainFrame.Position = UDim2.new(0.5, -60, 0.7, 0)
+mainFrame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+mainFrame.BackgroundTransparency = 0.2
+mainFrame.BorderSizePixel = 0
+mainFrame.Active = true
+mainFrame.Draggable = true
 
-local Indicator = Instance.new("Frame")
-Indicator.Size = UDim2.new(0, 160, 0, 40)
-Indicator.Position = UDim2.new(0, 10, 0, 10)
-Indicator.BackgroundColor3 = Color3.fromRGB(200, 255, 200)
-Indicator.BorderSizePixel = 0
-Indicator.AnchorPoint = Vector2.new(0,0)
-Indicator.Parent = ScreenGui
-Indicator.ZIndex = 10
+local flyButton = Instance.new("TextButton", mainFrame)
+flyButton.Size = UDim2.new(1, 0, 1, 0)
+flyButton.Text = "Fly: OFF"
+flyButton.TextColor3 = Color3.new(1, 1, 1)
+flyButton.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+flyButton.Font = Enum.Font.GothamBold
+flyButton.TextScaled = true
 
-local StatusLight = Instance.new("Frame")
-StatusLight.Size = UDim2.new(0, 30, 0, 30)
-StatusLight.Position = UDim2.new(0, 5, 0, 5)
-StatusLight.BackgroundColor3 = Color3.fromRGB(0, 255, 0) -- Green = SAFE
-StatusLight.BorderSizePixel = 1
-StatusLight.BorderColor3 = Color3.fromRGB(0, 100, 0)
-StatusLight.Parent = Indicator
-StatusLight.ZIndex = 11
-Instance.new("UICorner", StatusLight).CornerRadius = UDim.new(1, 0)
+--// Fly Logic
+local flying = false
+local bv = nil
+local speed = 50
 
-local StatusLabel = Instance.new("TextLabel")
-StatusLabel.Size = UDim2.new(1, -45, 1, 0)
-StatusLabel.Position = UDim2.new(0, 40, 0, 0)
-StatusLabel.BackgroundTransparency = 1
-StatusLabel.Text = "SAFE"
-StatusLabel.TextColor3 = Color3.new(0, 0, 0)
-StatusLabel.Font = Enum.Font.SourceSansBold
-StatusLabel.TextScaled = true
-StatusLabel.TextXAlignment = Enum.TextXAlignment.Left
-StatusLabel.Parent = Indicator
-StatusLabel.ZIndex = 11
+local moveDirection = Vector3.zero
 
-local function autoQuit(reason)
-    StatusLabel.Text = "DANGER"
-    StatusLight.BackgroundColor3 = Color3.fromRGB(255, 0, 0) -- Red = DANGER
-    Indicator.BackgroundColor3 = Color3.fromRGB(255, 200, 200)
-    print("[ANTI-MONITOR] Auto quitting: " .. reason)
-    wait(1)
-    LocalPlayer:Kick("[AUTO-QUIT] " .. reason)
-end
-
-print("[ANTI-MONITOR] Script started.")
-
-Players.PlayerChatted:Connect(function(player, message)
-    local msg = message:lower()
-    if player ~= LocalPlayer and (msg:find(LocalPlayer.Name:lower()) or msg:find("report")) then
-        autoQuit("Suspicious chat message detected")
-    end
+-- Update movement input for mobile or PC
+UserInputService.InputBegan:Connect(function(input, gpe)
+	if gpe then return end
+	if input.KeyCode == Enum.KeyCode.W then moveDirection = Vector3.new(0, 0, -1) end
+	if input.KeyCode == Enum.KeyCode.S then moveDirection = Vector3.new(0, 0, 1) end
+	if input.KeyCode == Enum.KeyCode.A then moveDirection = Vector3.new(-1, 0, 0) end
+	if input.KeyCode == Enum.KeyCode.D then moveDirection = Vector3.new(1, 0, 0) end
 end)
 
-local suspiciousKeywords = { "mod", "admin", "camera", "record", "staff", "monitor", "log" }
+UserInputService.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Keyboard then
+		moveDirection = Vector3.zero
+	end
+end)
 
-local function isSuspiciousName(name)
-    local lname = name:lower()
-    for _, keyword in pairs(suspiciousKeywords) do
-        if lname:find(keyword) then
-            return true
-        end
-    end
-    return false
-end
+--// Fly Toggle
+flyButton.MouseButton1Click:Connect(function()
+	flying = not flying
+	flyButton.Text = "Fly: " .. (flying and "ON" or "OFF")
 
-local function scanPlayer(player)
-    if player == LocalPlayer then return end
-    if isSuspiciousName(player.Name) or isSuspiciousName(player.DisplayName) then
-        autoQuit("Suspicious player name detected: " .. player.Name)
-    end
+	if flying then
+		-- Create BodyVelocity
+		bv = Instance.new("BodyVelocity")
+		bv.Velocity = Vector3.zero
+		bv.MaxForce = Vector3.new(1e5, 1e5, 1e5)
+		bv.P = 12500
+		bv.Parent = humanoidRootPart
+	else
+		if bv then
+			bv:Destroy()
+			bv = nil
+		end
+	end
+end)
 
-    player.CharacterAdded:Connect(function(char)
-        wait(2)
-        local hrp = char:FindFirstChild("HumanoidRootPart")
-        if not hrp or (hrp.Transparency >= 2) then
-            autoQuit("Invisible player character (monitor bot?) detected.")
-        end
-    end)
-end
-
-for _, player in pairs(Players:GetPlayers()) do
-    scanPlayer(player)
-end
-
-Players.PlayerAdded:Connect(scanPlayer)
+--// Movement update
+RunService.RenderStepped:Connect(function()
+	if flying and bv and character and humanoidRootPart then
+		local cam = workspace.CurrentCamera
+		local cf = cam.CFrame
+		local direction = cf:VectorToWorldSpace(moveDirection)
+		bv.Velocity = direction * speed
+	end
+end)
