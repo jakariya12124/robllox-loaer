@@ -1,107 +1,15 @@
 local Players = game:GetService("Players")
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local Workspace = game:GetService("Workspace")
+local RunService = game:GetService("RunService")
 
+local player = Players.LocalPlayer
+local enabled = false
+local warnings = 0
+local MAX_WARNINGS = 3
 local CHECK_INTERVAL = 1
 local DISTANCE_THRESHOLD = 60
-local MAX_WARNINGS = 3
 
-local warnings = {}
-local monitoringEnabled = {}
-
--- Create RemoteEvent
-local eventName = "ToggleAntiESPEvent"
-local toggleEvent = ReplicatedStorage:FindFirstChild(eventName)
-if not toggleEvent then
-	toggleEvent = Instance.new("RemoteEvent")
-	toggleEvent.Name = eventName
-	toggleEvent.Parent = ReplicatedStorage
-end
-
--- Helper functions
-local function stripVisualESPTools(character)
-	for _, v in ipairs(character:GetDescendants()) do
-		if v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment") then
-			v:Destroy()
-		elseif v:IsA("SurfaceAppearance") then
-			v:Destroy()
-		elseif v:IsA("BasePart") and v.Material == Enum.Material.Neon then
-			v.Material = Enum.Material.Plastic
-		end
-	end
-end
-
-local function hasLineOfSight(viewer, target)
-	local char1 = viewer.Character
-	local char2 = target.Character
-	if not (char1 and char2) then return false end
-
-	local hrp1 = char1:FindFirstChild("HumanoidRootPart")
-	local hrp2 = char2:FindFirstChild("HumanoidRootPart")
-	if not (hrp1 and hrp2) then return false end
-
-	local rayParams = RaycastParams.new()
-	rayParams.FilterDescendantsInstances = {char1}
-	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
-
-	local result = Workspace:Raycast(hrp1.Position, hrp2.Position - hrp1.Position, rayParams)
-	return result and char2:IsAncestorOf(result.Instance)
-end
-
-local function warnPlayer(player)
-	warnings[player] = (warnings[player] or 0) + 1
-	warn("[ANTI-ESP] Warning", warnings[player], "->", player.Name)
-
-	if warnings[player] >= MAX_WARNINGS then
-		player:Kick("ESP Detected. Exploiting is forbidden.")
-	end
-end
-
--- Monitoring per player
-local function monitor(player)
-	while player.Parent do
-		if not monitoringEnabled[player] then
-			wait(CHECK_INTERVAL)
-			continue
-		end
-
-		local char1 = player.Character
-		if char1 and char1:FindFirstChild("HumanoidRootPart") then
-			for _, other in ipairs(Players:GetPlayers()) do
-				if other ~= player and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
-					local dist = (char1.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
-
-					stripVisualESPTools(other.Character)
-
-					if dist > DISTANCE_THRESHOLD then
-						if hasLineOfSight(player, other) then
-							warnPlayer(player)
-						end
-					end
-				end
-			end
-		end
-		wait(CHECK_INTERVAL)
-	end
-end
-
--- RemoteEvent listener: toggle this player's monitoring
-toggleEvent.OnServerEvent:Connect(function(player, enabled)
-	monitoringEnabled[player] = enabled and true or false
-	if enabled then
-		print(player.Name .. " enabled Anti-ESP monitoring.")
-	else
-		print(player.Name .. " disabled Anti-ESP monitoring.")
-		warnings[player] = 0 -- reset warnings on disable
-	end
-end)
-
--- Client LocalScript source (GUI + toggle)
-local localScriptSource = [[
-local ReplicatedStorage = game:GetService("ReplicatedStorage")
-local player = game:GetService("Players").LocalPlayer
-local toggleEvent = ReplicatedStorage:WaitForChild("ToggleAntiESPEvent")
-
+-- Create GUI
 local screenGui = Instance.new("ScreenGui")
 screenGui.Name = "AntiESP_ToggleGui"
 screenGui.ResetOnSpawn = false
@@ -123,80 +31,90 @@ stroke.Color = Color3.fromRGB(0, 200, 255)
 stroke.Thickness = 2
 stroke.Parent = frame
 
-local function createButton(text, position)
-	local btn = Instance.new("TextButton")
-	btn.Size = UDim2.new(0.48, 0, 0, 25)
-	btn.Position = position
-	btn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
-	btn.TextColor3 = Color3.fromRGB(220, 220, 220)
-	btn.Font = Enum.Font.GothamBold
-	btn.TextSize = 14
-	btn.Text = text
-	btn.AutoButtonColor = true
-	btn.BorderSizePixel = 0
-	btn.Parent = frame
-	return btn
-end
+local toggleBtn = Instance.new("TextButton")
+toggleBtn.Size = UDim2.new(1, 0, 1, 0)
+toggleBtn.Position = UDim2.new(0, 0, 0, 0)
+toggleBtn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
+toggleBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
+toggleBtn.Font = Enum.Font.GothamBold
+toggleBtn.TextSize = 16
+toggleBtn.Text = "Activate Anti-ESP"
+toggleBtn.AutoButtonColor = true
+toggleBtn.BorderSizePixel = 0
+toggleBtn.Parent = frame
 
-local activateBtn = createButton("Activate", UDim2.new(0, 5, 0, 22))
-local disableBtn = createButton("Disable", UDim2.new(0.52, 5, 0, 22))
-
-local active = false
-local function updateButtons()
-	if active then
-		activateBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
-		disableBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-	else
-		activateBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-		disableBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
-	end
-end
-
-activateBtn.MouseButton1Click:Connect(function()
-	active = true
-	toggleEvent:FireServer(true)
-	updateButtons()
-end)
-
-disableBtn.MouseButton1Click:Connect(function()
-	active = false
-	toggleEvent:FireServer(false)
-	updateButtons()
-end)
-
-updateButtons()
-]]
-
--- When player joins, inject LocalScript + start monitoring
-Players.PlayerAdded:Connect(function(player)
-	warnings[player] = 0
-	monitoringEnabled[player] = false
-
-	player.CharacterAdded:Connect(function()
-		wait(2)
-		coroutine.wrap(function()
-			monitor(player)
-		end)()
-	end)
-
-	player.CharacterAdded:Wait()
-	local playerGui = player:WaitForChild("PlayerGui")
-	if not playerGui:FindFirstChild("AntiESP_LocalToggleScript") then
-		local localScript = Instance.new("LocalScript")
-		localScript.Name = "AntiESP_LocalToggleScript"
-		localScript.Source = localScriptSource
-		localScript.Parent = playerGui
-	end
-
-	player.AncestryChanged:Connect(function()
-		if not player:IsDescendantOf(game) then
-			warnings[player] = nil
-			monitoringEnabled[player] = nil
+local function stripVisualESPTools(character)
+	for _, v in ipairs(character:GetDescendants()) do
+		if v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment") then
+			v:Destroy()
+		elseif v:IsA("SurfaceAppearance") then
+			v:Destroy()
+		elseif v:IsA("BasePart") and v.Material == Enum.Material.Neon then
+			v.Material = Enum.Material.Plastic
 		end
-	end)
+	end
+end
+
+local function hasLineOfSight(target)
+	local char1 = player.Character
+	local char2 = target.Character
+	if not (char1 and char2) then return false end
+
+	local hrp1 = char1:FindFirstChild("HumanoidRootPart")
+	local hrp2 = char2:FindFirstChild("HumanoidRootPart")
+	if not (hrp1 and hrp2) then return false end
+
+	local rayParams = RaycastParams.new()
+	rayParams.FilterDescendantsInstances = {char1}
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+	local result = Workspace:Raycast(hrp1.Position, hrp2.Position - hrp1.Position, rayParams)
+	return result and char2:IsAncestorOf(result.Instance)
+end
+
+local function warn()
+	warnings = warnings + 1
+	warn("[ANTI-ESP] Warning " .. warnings .. " — suspicious ESP detected!")
+
+	if warnings >= MAX_WARNINGS then
+		player:Kick("Anti-ESP kicked you for suspicious behavior.")
+	end
+end
+
+local lastCheck = 0
+RunService.Heartbeat:Connect(function(dt)
+	if not enabled then return end
+	lastCheck = lastCheck + dt
+	if lastCheck < CHECK_INTERVAL then return end
+	lastCheck = 0
+
+	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
+	local char1 = player.Character
+
+	for _, other in ipairs(Players:GetPlayers()) do
+		if other ~= player and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
+			local dist = (char1.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
+
+			-- Remove ESP visuals locally
+			stripVisualESPTools(other.Character)
+
+			if dist > DISTANCE_THRESHOLD then
+				if hasLineOfSight(other) then
+					warn()
+				end
+			end
+		end
+	end
 end)
 
-Players.PlayerRemoving:Connect(function(player)
-	warnings[player] = nil
-	monitoringEnabled[player] = nil
+toggleBtn.MouseButton1Click:Connect(function()
+	enabled = not enabled
+	if enabled then
+		toggleBtn.Text = "Disable Anti-ESP"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
+	else
+		toggleBtn.Text = "Activate Anti-ESP"
+		toggleBtn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
+		warnings = 0
+	end
 end)
