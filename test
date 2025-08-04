@@ -1,17 +1,19 @@
--- Natural Valex-Style Fly with Smooth Rotation + Mobile Joystick + After Death Support
+-- Valex-Style Fly with Auto-Reactivate After Death
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
+-- Settings
 local speed = 50
 local gravityPull = -8
-local flying = false
 
+-- Variables
+local flying = false -- remembers fly state
 local bv, bg, humanoid, root
 
--- GUI setup (same as before)
+-- GUI Setup
 local gui = Instance.new("ScreenGui")
 gui.Name = "ValexFlyGUI"
 gui.ResetOnSpawn = false
@@ -37,25 +39,10 @@ button.Font = Enum.Font.GothamBold
 button.TextScaled = true
 button.Parent = frame
 
--- Helper for smooth gyro rotation
-local function lerpCFrame(a, b, alpha)
-	local qa = {a:GetComponents()}
-	local qb = {b:GetComponents()}
-	for i = 1, 12 do
-		qa[i] = qa[i] + (qb[i] - qa[i]) * alpha
-	end
-	return CFrame.new(
-		qa[1], qa[2], qa[3],
-		qa[4], qa[5], qa[6],
-		qa[7], qa[8], qa[9],
-		qa[10], qa[11], qa[12]
-	)
-end
-
-local function createFlight()
+-- Functions to start/stop flying
+local function startFlying()
 	if not root or not humanoid then return end
-
-	if not bv or bv.Parent ~= root then
+	if not bv or not bv.Parent then
 		bv = Instance.new("BodyVelocity")
 		bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
 		bv.P = 125000
@@ -64,10 +51,10 @@ local function createFlight()
 		bv.Parent = root
 	end
 
-	if not bg or bg.Parent ~= root then
+	if not bg or not bg.Parent then
 		bg = Instance.new("BodyGyro")
 		bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-		bg.P = 10000 -- lower P for smoother rotation
+		bg.P = 50000
 		bg.CFrame = workspace.CurrentCamera.CFrame
 		bg.Name = "FlyGyro"
 		bg.Parent = root
@@ -76,31 +63,31 @@ local function createFlight()
 	humanoid.PlatformStand = true
 end
 
-local function stopFlight()
+local function stopFlying()
 	if bv then bv:Destroy() end
 	if bg then bg:Destroy() end
 	bv, bg = nil, nil
 	if humanoid then humanoid.PlatformStand = false end
 end
 
+-- Toggle button clicked
 button.MouseButton1Click:Connect(function()
 	flying = not flying
 	button.Text = "Fly: " .. (flying and "ON" or "OFF")
 
 	if flying then
-		createFlight()
+		startFlying()
 	else
-		stopFlight()
+		stopFlying()
 	end
 end)
 
+-- Main fly logic loop
 RunService.RenderStepped:Connect(function()
 	if flying and humanoid and root and bv and bg then
 		local cam = workspace.CurrentCamera
 		local move = humanoid.MoveDirection
-
-		-- Smoothly interpolate the gyro CFrame towards camera CFrame with easing
-		bg.CFrame = bg.CFrame:Lerp(cam.CFrame, 0.15) -- 0.15 controls smoothness (lower = smoother)
+		bg.CFrame = cam.CFrame
 
 		local velocity = Vector3.zero
 		if move.Magnitude > 0 then
@@ -108,27 +95,31 @@ RunService.RenderStepped:Connect(function()
 			velocity = dir * speed
 		end
 
-		-- Add gentle upward float, not too rigid
-		velocity = velocity + Vector3.new(0, gravityPull * 0.6, 0)
+		-- Gravity pull always applied
+		velocity = velocity + Vector3.new(0, gravityPull, 0)
 		bv.Velocity = velocity
 	end
 end)
 
+-- Setup character references and handle respawn
 local function setupCharacter(char)
 	humanoid = char:WaitForChild("Humanoid")
 	root = char:WaitForChild("HumanoidRootPart")
 
+	-- Reapply flying if was on before death
 	if flying then
-		task.wait(0.1)
-		createFlight()
+		task.wait(0.1) -- wait a bit for physics to settle
+		startFlying()
 	end
 end
 
+-- On character respawn
 player.CharacterAdded:Connect(function(char)
-	stopFlight()
+	stopFlying() -- clear old forces just in case
 	setupCharacter(char)
 end)
 
+-- Initial setup if character already loaded
 if player.Character then
 	setupCharacter(player.Character)
 end
