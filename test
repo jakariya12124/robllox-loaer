@@ -1,19 +1,20 @@
--- Valex-Style Fly with Auto-Reactivate After Death
+-- Undetectable Smooth Valex-Style Fly + Speed Slider + Post-Death Reactivation
 
 local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
 
--- Settings
-local speed = 50
+local flying = false
 local gravityPull = -8
 
--- Variables
-local flying = false -- remembers fly state
+local MIN_SPEED = 12
+local MAX_SPEED = 120
+local speed = MIN_SPEED
+
 local bv, bg, humanoid, root
 
--- GUI Setup
+-- Create GUI
 local gui = Instance.new("ScreenGui")
 gui.Name = "ValexFlyGUI"
 gui.ResetOnSpawn = false
@@ -21,25 +22,105 @@ gui.IgnoreGuiInset = true
 gui.Parent = player:WaitForChild("PlayerGui")
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 130, 0, 50)
-frame.Position = UDim2.new(0.5, -65, 0.75, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BackgroundTransparency = 0.2
+frame.Size = UDim2.new(0, 180, 0, 70)
+frame.Position = UDim2.new(0.5, -90, 0.75, 0)
+frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
+frame.BackgroundTransparency = 0.1
 frame.BorderSizePixel = 0
+frame.AnchorPoint = Vector2.new(0.5, 0)
 frame.Active = true
 frame.Draggable = true
 frame.Parent = gui
 
+local stroke = Instance.new("UIStroke")
+stroke.Thickness = 1.5
+stroke.Color = Color3.fromRGB(0, 255, 255)
+stroke.Parent = frame
+
 local button = Instance.new("TextButton")
-button.Size = UDim2.new(1, 0, 1, 0)
+button.Size = UDim2.new(0, 80, 0, 35)
+button.Position = UDim2.new(0, 10, 0, 10)
+button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
+button.BackgroundTransparency = 0.15
+button.BorderSizePixel = 0
 button.Text = "Fly: OFF"
-button.TextColor3 = Color3.new(1, 1, 1)
-button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+button.TextColor3 = Color3.fromRGB(230, 230, 230)
 button.Font = Enum.Font.GothamBold
 button.TextScaled = true
+button.AutoButtonColor = true
 button.Parent = frame
 
--- Functions to start/stop flying
+local speedContainer = Instance.new("Frame")
+speedContainer.Size = UDim2.new(0, 80, 0, 25)
+speedContainer.Position = UDim2.new(0, 10, 0, 50)
+speedContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
+speedContainer.BackgroundTransparency = 0.2
+speedContainer.BorderSizePixel = 0
+speedContainer.Parent = frame
+
+local sliderBg = Instance.new("Frame")
+sliderBg.Size = UDim2.new(1, -4, 0, 6)
+sliderBg.Position = UDim2.new(0, 2, 0.5, -3)
+sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+sliderBg.BorderSizePixel = 0
+sliderBg.Parent = speedContainer
+
+local sliderFill = Instance.new("Frame")
+sliderFill.Size = UDim2.new(0, 0, 1, 0) -- initial 0 fill
+sliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+sliderFill.BorderSizePixel = 0
+sliderFill.Parent = sliderBg
+
+local knob = Instance.new("ImageButton")
+knob.Size = UDim2.new(0, 14, 0, 14)
+knob.Position = UDim2.new(0, -7, 0.5, -7)
+knob.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
+knob.BorderSizePixel = 0
+knob.AutoButtonColor = false
+knob.Parent = sliderBg
+knob.Image = ""
+
+local speedLabel = Instance.new("TextLabel")
+speedLabel.Size = UDim2.new(0, 80, 0, 14)
+speedLabel.Position = UDim2.new(0, 10, 1, 5)
+speedLabel.BackgroundTransparency = 1
+speedLabel.TextColor3 = Color3.fromRGB(150, 255, 255)
+speedLabel.Font = Enum.Font.Gotham
+speedLabel.TextSize = 14
+speedLabel.Text = "Speed: " .. speed
+speedLabel.Parent = frame
+
+local function updateSlider(x)
+	local sliderPos = math.clamp(x - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
+	local scale = sliderPos / sliderBg.AbsoluteSize.X
+	speed = MIN_SPEED + math.floor(scale * (MAX_SPEED - MIN_SPEED))
+	
+	sliderFill.Size = UDim2.new(scale, 0, 1, 0)
+	knob.Position = UDim2.new(scale, -7, 0.5, -7)
+	speedLabel.Text = "Speed: " .. speed
+end
+
+local dragging = false
+
+knob.InputBegan:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = true
+	end
+end)
+
+knob.InputEnded:Connect(function(input)
+	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
+		dragging = false
+	end
+end)
+
+RunService.RenderStepped:Connect(function()
+	if dragging then
+		local mouseLocation = game:GetService("UserInputService"):GetMouseLocation()
+		updateSlider(mouseLocation.X)
+	end
+end)
+
 local function startFlying()
 	if not root or not humanoid then return end
 	if not bv or not bv.Parent then
@@ -70,7 +151,6 @@ local function stopFlying()
 	if humanoid then humanoid.PlatformStand = false end
 end
 
--- Toggle button clicked
 button.MouseButton1Click:Connect(function()
 	flying = not flying
 	button.Text = "Fly: " .. (flying and "ON" or "OFF")
@@ -82,7 +162,6 @@ button.MouseButton1Click:Connect(function()
 	end
 end)
 
--- Main fly logic loop
 RunService.RenderStepped:Connect(function()
 	if flying and humanoid and root and bv and bg then
 		local cam = workspace.CurrentCamera
@@ -95,31 +174,26 @@ RunService.RenderStepped:Connect(function()
 			velocity = dir * speed
 		end
 
-		-- Gravity pull always applied
 		velocity = velocity + Vector3.new(0, gravityPull, 0)
 		bv.Velocity = velocity
 	end
 end)
 
--- Setup character references and handle respawn
 local function setupCharacter(char)
 	humanoid = char:WaitForChild("Humanoid")
 	root = char:WaitForChild("HumanoidRootPart")
 
-	-- Reapply flying if was on before death
 	if flying then
-		task.wait(0.1) -- wait a bit for physics to settle
+		task.wait(0.1)
 		startFlying()
 	end
 end
 
--- On character respawn
-player.CharacterAdded:Connect(function(char)
-	stopFlying() -- clear old forces just in case
+Players.LocalPlayer.CharacterAdded:Connect(function(char)
+	stopFlying()
 	setupCharacter(char)
 end)
 
--- Initial setup if character already loaded
 if player.Character then
 	setupCharacter(player.Character)
 end
