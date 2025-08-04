@@ -2,29 +2,18 @@ local Players = game:GetService("Players")
 local Workspace = game:GetService("Workspace")
 local RunService = game:GetService("RunService")
 
-local function waitForLocalPlayer()
-	local player = Players.LocalPlayer
-	while not player do
-		task.wait(0.1)
-		player = Players.LocalPlayer
-	end
-	return player
-end
-
-local player = waitForLocalPlayer()
-local playerGui = player:WaitForChild("PlayerGui")
-
--- Persistent vars in global env so toggling doesn't reset unexpectedly
-getgenv().antiESP_enabled = getgenv().antiESP_enabled or false
-getgenv().antiESP_warnings = getgenv().antiESP_warnings or 0
-local enabled = getgenv().antiESP_enabled
-local warnings = getgenv().antiESP_warnings
-
+local player = Players.LocalPlayer
+local enabled = false
+local warnings = 0
 local MAX_WARNINGS = 3
-local CHECK_INTERVAL = 1
+local CHECK_INTERVAL = 1.5
 local DISTANCE_THRESHOLD = 60
 
--- Create GUI only if not exists
+local lastCheckTime = 0
+
+-- GUI Setup (same as before)
+local playerGui = player:WaitForChild("PlayerGui")
+
 local screenGui = playerGui:FindFirstChild("AntiESP_ToggleGui")
 if not screenGui then
 	screenGui = Instance.new("ScreenGui")
@@ -33,7 +22,6 @@ if not screenGui then
 	screenGui.Parent = playerGui
 end
 
--- Remove old frame if any
 local oldFrame = screenGui:FindFirstChild("MainFrame")
 if oldFrame then oldFrame:Destroy() end
 
@@ -61,22 +49,34 @@ toggleBtn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
 toggleBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
 toggleBtn.Font = Enum.Font.GothamBold
 toggleBtn.TextSize = 16
-toggleBtn.Text = enabled and "Disable Anti-ESP" or "Activate Anti-ESP"
+toggleBtn.Text = "Activate Anti-ESP"
 toggleBtn.AutoButtonColor = true
 toggleBtn.BorderSizePixel = 0
 toggleBtn.Parent = frame
 
-local function stripVisualESPTools(character)
+-- Only remove exploit ESP marked with this attribute
+local EXPLOIT_ESP_TAG = "ExploitESP"
+
+local function stripExploitESP(character)
 	for _, v in ipairs(character:GetDescendants()) do
-		if v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment") then
+		if (v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment")) and v:GetAttribute(EXPLOIT_ESP_TAG) then
 			pcall(function() v:Destroy() end)
-		elseif v:IsA("SurfaceAppearance") then
-			pcall(function() v:Destroy() end)
-		elseif v:IsA("BasePart") and v.Material == Enum.Material.Neon then
-			pcall(function() v.Material = Enum.Material.Plastic end)
 		end
 	end
 end
+
+-- Optional: Mark all ESP highlights as exploit for test (remove this if you want)
+--[[
+for _, plr in ipairs(Players:GetPlayers()) do
+	if plr.Character then
+		for _, v in ipairs(plr.Character:GetDescendants()) do
+			if v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment") then
+				v:SetAttribute(EXPLOIT_ESP_TAG, true)
+			end
+		end
+	end
+end
+]]
 
 local function hasLineOfSight(target)
 	local char1 = player.Character
@@ -101,7 +101,6 @@ end
 
 local function warn()
 	warnings = warnings + 1
-	getgenv().antiESP_warnings = warnings
 	warn("[ANTI-ESP] Warning " .. warnings .. " — suspicious ESP detected!")
 
 	if warnings >= MAX_WARNINGS then
@@ -111,12 +110,11 @@ local function warn()
 	end
 end
 
-local accumulatedTime = 0
 RunService.RenderStepped:Connect(function(dt)
 	if not enabled then return end
-	accumulatedTime = accumulatedTime + dt
-	if accumulatedTime < CHECK_INTERVAL then return end
-	accumulatedTime = 0
+	lastCheckTime = lastCheckTime + dt
+	if lastCheckTime < CHECK_INTERVAL then return end
+	lastCheckTime = 0
 
 	if not player.Character or not player.Character:FindFirstChild("HumanoidRootPart") then return end
 	local char1 = player.Character
@@ -125,7 +123,8 @@ RunService.RenderStepped:Connect(function(dt)
 		if other ~= player and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
 			local dist = (char1.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
 
-			pcall(stripVisualESPTools, other.Character)
+			-- Only strip exploit ESP marked by attribute, so normal visuals stay
+			pcall(stripExploitESP, other.Character)
 
 			if dist > DISTANCE_THRESHOLD then
 				if hasLineOfSight(other) then
@@ -138,7 +137,6 @@ end)
 
 toggleBtn.MouseButton1Click:Connect(function()
 	enabled = not enabled
-	getgenv().antiESP_enabled = enabled
 	if enabled then
 		toggleBtn.Text = "Disable Anti-ESP"
 		toggleBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
@@ -146,6 +144,5 @@ toggleBtn.MouseButton1Click:Connect(function()
 		toggleBtn.Text = "Activate Anti-ESP"
 		toggleBtn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
 		warnings = 0
-		getgenv().antiESP_warnings = 0
 	end
 end)
