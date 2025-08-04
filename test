@@ -1,222 +1,202 @@
--- Valex-Style Fly with Auto-Reactivate After Death + Futuristic GUI + Speed Slider
-
 local Players = game:GetService("Players")
-local RunService = game:GetService("RunService")
-local UserInputService = game:GetService("UserInputService")
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local Workspace = game:GetService("Workspace")
 
-local player = Players.LocalPlayer
+local CHECK_INTERVAL = 1
+local DISTANCE_THRESHOLD = 60
+local MAX_WARNINGS = 3
 
--- Settings
-local flying = false
-local speed = 60 -- start at minimum speed 60
-local gravityPull = -8
+local warnings = {}
+local monitoringEnabled = {}
 
-local bv, bg, humanoid, root
+-- Create RemoteEvent
+local eventName = "ToggleAntiESPEvent"
+local toggleEvent = ReplicatedStorage:FindFirstChild(eventName)
+if not toggleEvent then
+	toggleEvent = Instance.new("RemoteEvent")
+	toggleEvent.Name = eventName
+	toggleEvent.Parent = ReplicatedStorage
+end
 
--- Create GUI
-local gui = Instance.new("ScreenGui")
-gui.Name = "ValexFlyGUI"
-gui.ResetOnSpawn = false
-gui.IgnoreGuiInset = true
-gui.Parent = player:WaitForChild("PlayerGui")
+-- Helper functions
+local function stripVisualESPTools(character)
+	for _, v in ipairs(character:GetDescendants()) do
+		if v:IsA("Highlight") or v:IsA("SelectionBox") or v:IsA("BoxHandleAdornment") then
+			v:Destroy()
+		elseif v:IsA("SurfaceAppearance") then
+			v:Destroy()
+		elseif v:IsA("BasePart") and v.Material == Enum.Material.Neon then
+			v.Material = Enum.Material.Plastic
+		end
+	end
+end
 
--- Main frame (small, futuristic style)
+local function hasLineOfSight(viewer, target)
+	local char1 = viewer.Character
+	local char2 = target.Character
+	if not (char1 and char2) then return false end
+
+	local hrp1 = char1:FindFirstChild("HumanoidRootPart")
+	local hrp2 = char2:FindFirstChild("HumanoidRootPart")
+	if not (hrp1 and hrp2) then return false end
+
+	local rayParams = RaycastParams.new()
+	rayParams.FilterDescendantsInstances = {char1}
+	rayParams.FilterType = Enum.RaycastFilterType.Blacklist
+
+	local result = Workspace:Raycast(hrp1.Position, hrp2.Position - hrp1.Position, rayParams)
+	return result and char2:IsAncestorOf(result.Instance)
+end
+
+local function warnPlayer(player)
+	warnings[player] = (warnings[player] or 0) + 1
+	warn("[ANTI-ESP] Warning", warnings[player], "->", player.Name)
+
+	if warnings[player] >= MAX_WARNINGS then
+		player:Kick("ESP Detected. Exploiting is forbidden.")
+	end
+end
+
+-- Monitoring per player
+local function monitor(player)
+	while player.Parent do
+		if not monitoringEnabled[player] then
+			wait(CHECK_INTERVAL)
+			continue
+		end
+
+		local char1 = player.Character
+		if char1 and char1:FindFirstChild("HumanoidRootPart") then
+			for _, other in ipairs(Players:GetPlayers()) do
+				if other ~= player and other.Character and other.Character:FindFirstChild("HumanoidRootPart") then
+					local dist = (char1.HumanoidRootPart.Position - other.Character.HumanoidRootPart.Position).Magnitude
+
+					stripVisualESPTools(other.Character)
+
+					if dist > DISTANCE_THRESHOLD then
+						if hasLineOfSight(player, other) then
+							warnPlayer(player)
+						end
+					end
+				end
+			end
+		end
+		wait(CHECK_INTERVAL)
+	end
+end
+
+-- RemoteEvent listener: toggle this player's monitoring
+toggleEvent.OnServerEvent:Connect(function(player, enabled)
+	monitoringEnabled[player] = enabled and true or false
+	if enabled then
+		print(player.Name .. " enabled Anti-ESP monitoring.")
+	else
+		print(player.Name .. " disabled Anti-ESP monitoring.")
+		warnings[player] = 0 -- reset warnings on disable
+	end
+end)
+
+-- Client LocalScript source (GUI + toggle)
+local localScriptSource = [[
+local ReplicatedStorage = game:GetService("ReplicatedStorage")
+local player = game:GetService("Players").LocalPlayer
+local toggleEvent = ReplicatedStorage:WaitForChild("ToggleAntiESPEvent")
+
+local screenGui = Instance.new("ScreenGui")
+screenGui.Name = "AntiESP_ToggleGui"
+screenGui.ResetOnSpawn = false
+screenGui.Parent = player:WaitForChild("PlayerGui")
+
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 180, 0, 70)
-frame.Position = UDim2.new(0.5, -90, 0.75, 0)
-frame.BackgroundColor3 = Color3.fromRGB(20, 20, 25)
-frame.BackgroundTransparency = 0.1
+frame.Size = UDim2.new(0, 180, 0, 50)
+frame.Position = UDim2.new(1, -190, 0, 20)
+frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
 frame.BorderSizePixel = 0
-frame.AnchorPoint = Vector2.new(0.5, 0)
+frame.BackgroundTransparency = 0.15
+frame.Parent = screenGui
+frame.AnchorPoint = Vector2.new(1, 0)
 frame.Active = true
 frame.Draggable = true
-frame.Parent = gui
 
--- UIStroke for futuristic glow outline
 local stroke = Instance.new("UIStroke")
-stroke.Thickness = 1.5
-stroke.Color = Color3.fromRGB(0, 255, 255)
+stroke.Color = Color3.fromRGB(0, 200, 255)
+stroke.Thickness = 2
 stroke.Parent = frame
 
--- Fly toggle button (smaller, clean)
-local button = Instance.new("TextButton")
-button.Size = UDim2.new(0, 80, 0, 35)
-button.Position = UDim2.new(0, 10, 0, 10)
-button.BackgroundColor3 = Color3.fromRGB(0, 170, 255)
-button.BackgroundTransparency = 0.15
-button.BorderSizePixel = 0
-button.Text = "Fly: OFF"
-button.TextColor3 = Color3.fromRGB(230, 230, 230)
-button.Font = Enum.Font.GothamBold
-button.TextScaled = true
-button.AutoButtonColor = true
-button.Parent = frame
-
--- Speed slider container
-local speedContainer = Instance.new("Frame")
-speedContainer.Size = UDim2.new(0, 80, 0, 25)
-speedContainer.Position = UDim2.new(0, 10, 0, 50)
-speedContainer.BackgroundColor3 = Color3.fromRGB(10, 10, 15)
-speedContainer.BackgroundTransparency = 0.2
-speedContainer.BorderSizePixel = 0
-speedContainer.Parent = frame
-
--- Slider background bar
-local sliderBg = Instance.new("Frame")
-sliderBg.Size = UDim2.new(1, -4, 0, 6)
-sliderBg.Position = UDim2.new(0, 2, 0.5, -3)
-sliderBg.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-sliderBg.BorderSizePixel = 0
-sliderBg.Parent = speedContainer
-
--- Slider fill bar
-local sliderFill = Instance.new("Frame")
-sliderFill.Size = UDim2.new((speed - 60) / 140, 0, 1, 0) -- initial fill relative to speed (range 60-200)
-sliderFill.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-sliderFill.BorderSizePixel = 0
-sliderFill.Parent = sliderBg
-
--- Slider knob
-local knob = Instance.new("ImageButton")
-knob.Size = UDim2.new(0, 14, 0, 14)
-knob.Position = UDim2.new(sliderFill.Size.X.Scale, -7, 0.5, -7)
-knob.BackgroundColor3 = Color3.fromRGB(0, 255, 255)
-knob.BorderSizePixel = 0
-knob.AutoButtonColor = false
-knob.Parent = sliderBg
-knob.Image = "" -- no image, just color circle
-knob.Name = "Knob"
-
--- Speed label
-local speedLabel = Instance.new("TextLabel")
-speedLabel.Size = UDim2.new(0, 80, 0, 14)
-speedLabel.Position = UDim2.new(0, 10, 1, 5)
-speedLabel.BackgroundTransparency = 1
-speedLabel.TextColor3 = Color3.fromRGB(150, 255, 255)
-speedLabel.Font = Enum.Font.Gotham
-speedLabel.TextSize = 14
-speedLabel.Text = "Speed: " .. speed
-speedLabel.Parent = frame
-
--- Function to update slider UI & speed value
-local function updateSlider(x)
-	local sliderPos = math.clamp(x - sliderBg.AbsolutePosition.X, 0, sliderBg.AbsoluteSize.X)
-	local scale = sliderPos / sliderBg.AbsoluteSize.X
-	speed = 60 + math.floor(scale * 140) -- speed from 60 to 200
-
-	-- Update UI elements
-	sliderFill.Size = UDim2.new(scale, 0, 1, 0)
-	knob.Position = UDim2.new(scale, -7, 0.5, -7)
-	speedLabel.Text = "Speed: " .. speed
+local function createButton(text, position)
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(0.48, 0, 0, 25)
+	btn.Position = position
+	btn.BackgroundColor3 = Color3.fromRGB(10, 90, 120)
+	btn.TextColor3 = Color3.fromRGB(220, 220, 220)
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 14
+	btn.Text = text
+	btn.AutoButtonColor = true
+	btn.BorderSizePixel = 0
+	btn.Parent = frame
+	return btn
 end
 
--- Dragging logic
-local dragging = false
+local activateBtn = createButton("Activate", UDim2.new(0, 5, 0, 22))
+local disableBtn = createButton("Disable", UDim2.new(0.52, 5, 0, 22))
 
-knob.InputBegan:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = true
-	end
-end)
-
-knob.InputEnded:Connect(function(input)
-	if input.UserInputType == Enum.UserInputType.Touch or input.UserInputType == Enum.UserInputType.MouseButton1 then
-		dragging = false
-	end
-end)
-
-RunService.RenderStepped:Connect(function()
-	if dragging then
-		local mouseLocation = UserInputService:GetMouseLocation()
-		updateSlider(mouseLocation.X)
-	end
-end)
-
--- Fly start/stop functions
-local function startFlying()
-	if not root or not humanoid then return end
-
-	if not bv or not bv.Parent then
-		bv = Instance.new("BodyVelocity")
-		bv.MaxForce = Vector3.new(1e9, 1e9, 1e9)
-		bv.P = 125000
-		bv.Name = "FlyVelocity"
-		bv.Velocity = Vector3.zero
-		bv.Parent = root
-	end
-
-	if not bg or not bg.Parent then
-		bg = Instance.new("BodyGyro")
-		bg.MaxTorque = Vector3.new(1e9, 1e9, 1e9)
-		bg.P = 50000
-		bg.CFrame = workspace.CurrentCamera.CFrame
-		bg.Name = "FlyGyro"
-		bg.Parent = root
-	end
-
-	humanoid.PlatformStand = true
-end
-
-local function stopFlying()
-	if bv then bv:Destroy() end
-	if bg then bg:Destroy() end
-	bv, bg = nil, nil
-	if humanoid then humanoid.PlatformStand = false end
-end
-
--- Button click toggle
-button.MouseButton1Click:Connect(function()
-	flying = not flying
-	button.Text = "Fly: " .. (flying and "ON" or "OFF")
-
-	if flying then
-		startFlying()
+local active = false
+local function updateButtons()
+	if active then
+		activateBtn.BackgroundColor3 = Color3.fromRGB(0, 150, 50)
+		disableBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
 	else
-		stopFlying()
+		activateBtn.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+		disableBtn.BackgroundColor3 = Color3.fromRGB(150, 0, 0)
 	end
+end
+
+activateBtn.MouseButton1Click:Connect(function()
+	active = true
+	toggleEvent:FireServer(true)
+	updateButtons()
 end)
 
--- Main loop for fly movement
-RunService.RenderStepped:Connect(function()
-	if flying and humanoid and root and bv and bg then
-		local cam = workspace.CurrentCamera
-		local move = humanoid.MoveDirection
-
-		-- Use camera's look direction for orientation
-		bg.CFrame = cam.CFrame
-
-		local velocity = Vector3.zero
-		if move.Magnitude > 0 then
-			local dir = cam.CFrame:VectorToWorldSpace(move.Unit)
-			velocity = dir.Unit * speed
-		else
-			-- Slight vertical lift to prevent falling if idle
-			velocity = Vector3.new(0, 0.1, 0)
-		end
-
-		velocity = velocity + Vector3.new(0, gravityPull, 0)
-		bv.Velocity = velocity
-	end
+disableBtn.MouseButton1Click:Connect(function()
+	active = false
+	toggleEvent:FireServer(false)
+	updateButtons()
 end)
 
--- Setup character and fly on respawn if needed
-local function setupCharacter(char)
-	task.spawn(function()
-		humanoid = char:WaitForChild("Humanoid")
-		root = char:WaitForChild("HumanoidRootPart")
+updateButtons()
+]]
 
-		task.wait(0.3) -- wait a bit to ensure everything loads
-		if flying then
-			startFlying()
+-- When player joins, inject LocalScript + start monitoring
+Players.PlayerAdded:Connect(function(player)
+	warnings[player] = 0
+	monitoringEnabled[player] = false
+
+	player.CharacterAdded:Connect(function()
+		wait(2)
+		coroutine.wrap(function()
+			monitor(player)
+		end)()
+	end)
+
+	player.CharacterAdded:Wait()
+	local playerGui = player:WaitForChild("PlayerGui")
+	if not playerGui:FindFirstChild("AntiESP_LocalToggleScript") then
+		local localScript = Instance.new("LocalScript")
+		localScript.Name = "AntiESP_LocalToggleScript"
+		localScript.Source = localScriptSource
+		localScript.Parent = playerGui
+	end
+
+	player.AncestryChanged:Connect(function()
+		if not player:IsDescendantOf(game) then
+			warnings[player] = nil
+			monitoringEnabled[player] = nil
 		end
 	end)
-end
-
-player.CharacterAdded:Connect(function(char)
-	stopFlying()
-	setupCharacter(char)
 end)
 
-if player.Character then
-	setupCharacter(player.Character)
-end
+Players.PlayerRemoving:Connect(function(player)
+	warnings[player] = nil
+	monitoringEnabled[player] = nil
+end)
