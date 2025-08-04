@@ -3,53 +3,72 @@ local Players = game:GetService("Players")
 local RunService = game:GetService("RunService")
 
 local player = Players.LocalPlayer
-local character = player.Character or player.CharacterAdded:Wait()
-local humanoid = character:WaitForChild("Humanoid")
-local root = character:WaitForChild("HumanoidRootPart")
 
--- GUI
-local gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
-gui.Name = "FlyGui"
-gui.ResetOnSpawn = false
-
-local frame = Instance.new("Frame", gui)
-frame.Size = UDim2.new(0, 130, 0, 50)
-frame.Position = UDim2.new(0.5, -65, 0.75, 0)
-frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
-frame.BackgroundTransparency = 0.2
-frame.BorderSizePixel = 0
-frame.Active = true
-frame.Draggable = true
-
-local button = Instance.new("TextButton", frame)
-button.Size = UDim2.new(1, 0, 1, 0)
-button.Text = "Fly: OFF"
-button.TextColor3 = Color3.new(1, 1, 1)
-button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
-button.Font = Enum.Font.GothamBold
-button.TextScaled = true
-
--- Variables
+-- Settings
+local speed = 50
+local gravityPull = -8
 local flying = false
 local bv, bg
-local speed = 50
-local gravityPull = -8 -- simulate gravity pull
+local root, humanoid
+local gui, button
 
--- Create force
+-- Setup GUI
+local function createGUI()
+	if gui then gui:Destroy() end
+
+	gui = Instance.new("ScreenGui", player:WaitForChild("PlayerGui"))
+	gui.Name = "FlyGui"
+	gui.ResetOnSpawn = false
+
+	local frame = Instance.new("Frame", gui)
+	frame.Size = UDim2.new(0, 130, 0, 50)
+	frame.Position = UDim2.new(0.5, -65, 0.75, 0)
+	frame.BackgroundColor3 = Color3.fromRGB(30, 30, 30)
+	frame.BackgroundTransparency = 0.2
+	frame.BorderSizePixel = 0
+	frame.Active = true
+	frame.Draggable = true
+
+	button = Instance.new("TextButton", frame)
+	button.Size = UDim2.new(1, 0, 1, 0)
+	button.Text = "Fly: OFF"
+	button.TextColor3 = Color3.new(1, 1, 1)
+	button.BackgroundColor3 = Color3.fromRGB(60, 60, 60)
+	button.Font = Enum.Font.GothamBold
+	button.TextScaled = true
+
+	button.MouseButton1Click:Connect(function()
+		flying = not flying
+		button.Text = "Fly: " .. (flying and "ON" or "OFF")
+
+		if flying then
+			startFlying()
+		else
+			stopFlying()
+		end
+	end)
+end
+
+-- Fly Parts
 local function startFlying()
-	bv = Instance.new("BodyVelocity")
-	bv.Name = "FlyVelocity"
-	bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
-	bv.P = 125000
-	bv.Velocity = Vector3.zero
-	bv.Parent = root
+	if not root then return end
 
-	bg = Instance.new("BodyGyro")
-	bg.Name = "FlyGyro"
-	bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
-	bg.P = 50000
-	bg.CFrame = workspace.CurrentCamera.CFrame
-	bg.Parent = root
+	if not bv or not bv.Parent then
+		bv = Instance.new("BodyVelocity")
+		bv.MaxForce = Vector3.new(1e6, 1e6, 1e6)
+		bv.P = 125000
+		bv.Name = "FlyVelocity"
+		bv.Parent = root
+	end
+
+	if not bg or not bg.Parent then
+		bg = Instance.new("BodyGyro")
+		bg.MaxTorque = Vector3.new(1e6, 1e6, 1e6)
+		bg.P = 50000
+		bg.CFrame = workspace.CurrentCamera.CFrame
+		bg.Name = "FlyGyro"
+		bg.Parent = root
+	end
 
 	humanoid.PlatformStand = true
 end
@@ -57,23 +76,12 @@ end
 local function stopFlying()
 	if bv then bv:Destroy(); bv = nil end
 	if bg then bg:Destroy(); bg = nil end
-	humanoid.PlatformStand = false
+	if humanoid then humanoid.PlatformStand = false end
 end
 
-button.MouseButton1Click:Connect(function()
-	flying = not flying
-	button.Text = "Fly: " .. (flying and "ON" or "OFF")
-	
-	if flying then
-		startFlying()
-	else
-		stopFlying()
-	end
-end)
-
--- Flight Loop
+-- Update fly physics
 RunService.RenderStepped:Connect(function()
-	if flying and bv and bg then
+	if flying and humanoid and root and bv and bg then
 		local move = humanoid.MoveDirection
 		local cam = workspace.CurrentCamera
 		bg.CFrame = cam.CFrame
@@ -84,8 +92,28 @@ RunService.RenderStepped:Connect(function()
 			velocity = dir * speed
 		end
 
-		-- Apply small gravity pull even while flying
 		velocity = velocity + Vector3.new(0, gravityPull, 0)
 		bv.Velocity = velocity
 	end
 end)
+
+-- Setup character refs
+local function onCharacterAdded(char)
+	char:WaitForChild("HumanoidRootPart")
+	char:WaitForChild("Humanoid")
+
+	humanoid = char:WaitForChild("Humanoid")
+	root = char:WaitForChild("HumanoidRootPart")
+
+	if flying then
+		startFlying()
+	end
+
+	createGUI()
+end
+
+-- Connect character spawn
+player.CharacterAdded:Connect(onCharacterAdded)
+if player.Character then
+	onCharacterAdded(player.Character)
+end
