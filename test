@@ -75,7 +75,15 @@ getKey.TextScaled = true
 getKey.BackgroundColor3 = Color3.fromRGB(40, 40, 50)
 Instance.new("UICorner", getKey).CornerRadius = UDim.new(0, 8)
 
---// Anti Monitor GUI + AutoQuit
+--// Get Key Clipboard
+getKey.MouseButton1Click:Connect(function()
+	local success = pcall(function()
+		setclipboard("https://lootdest.org/s?DqH3tKqM")
+	end)
+	box.PlaceholderText = success and "Key copied URL 📋" or "Manual Key URL"
+end)
+
+--// Anti-Monitor GUI + Real-Time Auto Protection
 local function loadAntiMonitorScript()
 	local PlayerGui = LocalPlayer:WaitForChild("PlayerGui")
 	local ScreenGui = Instance.new("ScreenGui", PlayerGui)
@@ -120,13 +128,10 @@ local function loadAntiMonitorScript()
 	end)
 
 	local suspiciousKeywords = { "mod", "admin", "camera", "record", "staff", "monitor", "log" }
-
 	local function isSuspiciousName(name)
 		local lname = name:lower()
 		for _, keyword in pairs(suspiciousKeywords) do
-			if lname:find(keyword) then
-				return true
-			end
+			if lname:find(keyword) then return true end
 		end
 		return false
 	end
@@ -134,39 +139,28 @@ local function loadAntiMonitorScript()
 	local function scanPlayer(player)
 		if player == LocalPlayer then return end
 		if isSuspiciousName(player.Name) or isSuspiciousName(player.DisplayName) then
-			autoQuit("Suspicious player name detected: " .. player.Name)
+			autoQuit("Suspicious player name: " .. player.Name)
 		end
-
 		player.CharacterAdded:Connect(function(char)
 			wait(2)
 			local hrp = char:FindFirstChild("HumanoidRootPart")
 			if not hrp or (hrp.Transparency >= 2) then
-				autoQuit("Invisible player character (monitor bot?) detected.")
+				autoQuit("Invisible character detected")
 			end
 		end)
 	end
 
-	for _, player in pairs(Players:GetPlayers()) do
-		scanPlayer(player)
-	end
+	for _, player in pairs(Players:GetPlayers()) do scanPlayer(player) end
 	Players.PlayerAdded:Connect(scanPlayer)
 end
 
---// Get Key Clipboard Logic
-getKey.MouseButton1Click:Connect(function()
-	local success = pcall(function()
-		setclipboard("https://lootdest.org/s?DqH3tKqM")
-	end)
-	box.PlaceholderText = success and "Key copied URL 📋" or "Manual Key URL"
-end)
-
---// UNLOCK BUTTON → Run full protection
+--// Unlock Logic
 button.MouseButton1Click:Connect(function()
 	if box.Text == expectedKey then
 		gui:Destroy()
 		loadAntiMonitorScript()
 
-		-- RUN FULL ANTI SCRIPT
+		--// Movement check
 		local lastPos = nil
 		RunService.Heartbeat:Connect(function()
 			pcall(function()
@@ -183,6 +177,7 @@ button.MouseButton1Click:Connect(function()
 			end)
 		end)
 
+		--// Exploit scan
 		local knownExploits = {"syn", "fluxus", "electron", "valyse", "elysian", "krnl", "delta", "oxygen"}
 		for _, v in pairs(getfenv or debug.getregistry and debug.getregistry()) do
 			for _, keyword in ipairs(knownExploits) do
@@ -192,6 +187,7 @@ button.MouseButton1Click:Connect(function()
 			end
 		end
 
+		--// Remote GUI Scan
 		RunService.Stepped:Connect(function()
 			if CoreGui:FindFirstChild("RemoteSpy") or CoreGui:FindFirstChild("Dex") or CoreGui:FindFirstChild("SimpleSpy") then
 				LocalPlayer:Kick("RemoteSpy detected.")
@@ -206,6 +202,7 @@ button.MouseButton1Click:Connect(function()
 			end
 		end)
 
+		--// Crash detector
 		RunService.Heartbeat:Connect(function()
 			local success, _ = pcall(function() task.wait() end)
 			if not success then
@@ -213,15 +210,18 @@ button.MouseButton1Click:Connect(function()
 			end
 		end)
 
+		--// Idle bypass detection
 		LocalPlayer.Idled:Connect(function()
 			LocalPlayer:Kick("Idle kick bypass detected.")
 		end)
 
+		--// Hook wait
 		if hookfunction then
 			local oldWait = wait
 			hookfunction(wait, function(...) return oldWait(...) end)
 		end
 
+		--// getgenv scan
 		if getgenv then
 			local suspiciousKeys = {"fly", "speed", "esp", "aimbot", "noclip", "god", "key"}
 			for k, v in pairs(getgenv()) do
@@ -235,7 +235,7 @@ button.MouseButton1Click:Connect(function()
 			end
 		end
 
-		-- SIMPLE ANTI-KICK + ANTI-REMOTE
+		--// SIMPLE ANTI-KICK + ANTI-REMOTE
 		local mt = getrawmetatable(game)
 		setreadonly(mt, false)
 		local oldNamecall = mt.__namecall
@@ -263,7 +263,6 @@ button.MouseButton1Click:Connect(function()
 				end
 			end
 		end
-
 	else
 		box.Text = "❌ Invalid Key"
 		wait(1)
